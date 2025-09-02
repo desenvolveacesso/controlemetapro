@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --primary: #4361ee;
@@ -533,7 +534,7 @@
                     <div id="emptyRelatorios" class="empty-state">
                         <i class="fas fa-chart-pie"></i>
                         <h4>Nenhum dado disponível</h4>
-                        <p>Adicione vendedoras и vendas para gerar relatórios.</p>
+                        <p>Adicione vendedoras e vendas para gerar relatórios.</p>
                     </div>
                     <div class="table-responsive d-none" id="tableRelatorios">
                         <table class="table table-hover" id="reportTable">
@@ -638,7 +639,8 @@
                         <div class="mb-3">
                             <label class="form-label">E-mail</label>
                             <input type="email" class="form-control" id="vendedoraEmail">
-                        </form>
+                        </div>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -863,9 +865,7 @@
                 const vendaMedia = totalVendas > 0 ? totalValorLiquido / totalVendas : 0;
                 const itensPorVenda = totalVendas > 0 ? totalPecas / totalVendas : 0;
                 const precoMedio = totalPecas > 0 ? totalValorLiquido / totalPecas : 0;
-                
-                // Cálculo CORRETO do ticket médio: (valor líquido + consignado) / atendimentos
-                const ticketMedio = totalAtendimentos > 0 ? (totalValorLiquido + totalConsignado) / totalAtendimentos : 0;
+                const ticketMedio = totalAtendimentos > 0 ? totalValorLiquido / totalAtendimentos : 0;
                 
                 desempenho.push({
                     id: vendedora.id,
@@ -888,64 +888,57 @@
             return desempenho;
         }
 
-        function calcularTotaisGerais(vendasFiltradas = vendas) {
-            const totalValorLiquido = vendasFiltradas.reduce((acc, v) => acc + v.valorLiquido, 0);
-            const totalConsignado = vendasFiltradas.reduce((acc, v) => acc + v.consignado, 0);
-            const totalVendas = vendasFiltradas.length;
-            const totalPecas = vendasFiltradas.reduce((acc, v) => acc + v.pecas, 0);
-            const totalAtendimentos = vendasFiltradas.reduce((acc, v) => acc + v.atendimentos, 0);
+        function atualizarDashboard() {
+            const hoje = new Date();
+            const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            const vendasMes = vendas.filter(v => {
+                const dataVenda = new Date(v.data);
+                return dataVenda >= primeiroDiaMes && dataVenda <= hoje;
+            });
             
+            const totalValorLiquido = vendasMes.reduce((acc, v) => acc + v.valorLiquido, 0);
+            const totalConsignado = vendasMes.reduce((acc, v) => acc + v.consignado, 0);
+            const totalPecas = vendasMes.reduce((acc, v) => acc + v.pecas, 0);
+            
+            // Calcular meta total (soma das metas das vendedoras)
             const metaTotal = vendedoras.reduce((acc, v) => acc + v.meta, 0);
             const metaAtingida = metaTotal > 0 ? (totalValorLiquido / metaTotal) * 100 : 0;
+            
+            // Atualizar cards
+            document.getElementById('valorLiquido').textContent = formatarMoeda(totalValorLiquido);
+            document.getElementById('valorConsignado').textContent = formatarMoeda(totalConsignado);
+            document.getElementById('metaAtingida').textContent = `${metaAtingida.toFixed(1)}%`;
+            document.getElementById('pecasFaturadas').textContent = totalPecas;
+            
+            // Calcular resumo do mês
+            const totalVendas = vendasMes.length;
+            const totalAtendimentos = vendasMes.reduce((acc, v) => acc + v.atendimentos, 0);
             const vendaMedia = totalVendas > 0 ? totalValorLiquido / totalVendas : 0;
             const itensPorVenda = totalVendas > 0 ? totalPecas / totalVendas : 0;
             const precoMedio = totalPecas > 0 ? totalValorLiquido / totalPecas : 0;
+            const ticketMedio = totalAtendimentos > 0 ? totalValorLiquido / totalAtendimentos : 0;
             
-            // Cálculo CORRETO do ticket médio: (valor líquido + consignado) / atendimentos
-            const ticketMedio = totalAtendimentos > 0 ? (totalValorLiquido + totalConsignado) / totalAtendimentos : 0;
-            
-            return {
-                valorLiquido: totalValorLiquido,
-                consignado: totalConsignado,
-                vendas: totalVendas,
-                pecas: totalPecas,
-                atendimentos: totalAtendimentos,
-                metaTotal: metaTotal,
-                metaAtingida: metaAtingida,
-                vendaMedia: vendaMedia,
-                itensPorVenda: itensPorVenda,
-                precoMedio: precoMedio,
-                ticketMedio: ticketMedio
-            };
-        }
-
-        function atualizarDashboard() {
-            const totais = calcularTotaisGerais();
-            
-            // Atualizar cards de estatísticas
-            document.getElementById('valorLiquido').textContent = formatarMoeda(totais.valorLiquido);
-            document.getElementById('valorConsignado').textContent = formatarMoeda(totais.consignado);
-            document.getElementById('metaAtingida').textContent = `${totais.metaAtingida.toFixed(1)}%`;
-            document.getElementById('pecasFaturadas').textContent = totais.pecas;
-            
-            // Atualizar resumo do mês
-            document.getElementById('vendasEfetuadas').textContent = totais.vendas;
-            document.getElementById('totalPecas').textContent = totais.pecas;
-            document.getElementById('vendaMedia').textContent = formatarMoeda(totais.vendaMedia);
-            document.getElementById('itensPorVenda').textContent = totais.itensPorVenda.toFixed(1);
-            document.getElementById('precoMedio').textContent = formatarMoeda(totais.precoMedio);
-            document.getElementById('ticketMedio').textContent = formatarMoeda(totais.ticketMedio);
+            document.getElementById('vendasEfetuadas').textContent = totalVendas;
+            document.getElementById('totalPecas').textContent = totalPecas;
+            document.getElementById('vendaMedia').textContent = formatarMoeda(vendaMedia);
+            document.getElementById('itensPorVenda').textContent = itensPorVenda.toFixed(1);
+            document.getElementById('precoMedio').textContent = formatarMoeda(precoMedio);
+            document.getElementById('ticketMedio').textContent = formatarMoeda(ticketMedio);
             
             // Atualizar tabela de desempenho
-            const desempenho = calcularDesempenhoVendedoras();
-            const tableDesempenho = document.getElementById('desempenhoTable').querySelector('tbody');
-            tableDesempenho.innerHTML = '';
+            const desempenho = calcularDesempenhoVendedoras(vendasMes);
+            const tableBody = document.querySelector('#desempenhoTable tbody');
+            tableBody.innerHTML = '';
             
             if (desempenho.length > 0) {
                 document.getElementById('emptyDesempenho').classList.add('d-none');
                 document.getElementById('tableDesempenho').classList.remove('d-none');
                 
                 desempenho.forEach(d => {
+                    const progressoClass = d.metaAtingida >= 100 ? 'bg-success' : 
+                                          d.metaAtingida >= 70 ? 'bg-primary' : 
+                                          d.metaAtingida >= 50 ? 'bg-warning' : 'bg-danger';
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${d.nome}</td>
@@ -953,14 +946,15 @@
                         <td>${formatarMoeda(d.valorLiquido)}</td>
                         <td>
                             <div class="progress">
-                                <div class="progress-bar" role="progressbar" style="width: ${Math.min(d.metaAtingida, 100)}%;" 
-                                    aria-valuenow="${d.metaAtingida}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar ${progressoClass}" role="progressbar" 
+                                     style="width: ${Math.min(d.metaAtingida, 100)}%;" 
+                                     aria-valuenow="${d.metaAtingida}" aria-valuemin="0" aria-valuemax="100">
                                     ${d.metaAtingida.toFixed(1)}%
                                 </div>
                             </div>
                         </td>
                     `;
-                    tableDesempenho.appendChild(row);
+                    tableBody.appendChild(row);
                 });
             } else {
                 document.getElementById('emptyDesempenho').classList.remove('d-none');
@@ -972,92 +966,113 @@
         }
 
         function atualizarGraficosDashboard(desempenho) {
-            // Destruir gráficos existentes
-            if (desempenhoChart) desempenhoChart.destroy();
-            if (distribuicaoChart) distribuicaoChart.destroy();
-            
-            // Gráfico de desempenho
+            // Gráfico de desempenho (barras)
             const ctxDesempenho = document.getElementById('desempenhoChart').getContext('2d');
-            desempenhoChart = new Chart(ctxDesempenho, {
-                type: 'bar',
-                data: {
-                    labels: desempenho.map(d => d.nome),
-                    datasets: [{
-                        label: 'Valor Líquido',
-                        data: desempenho.map(d => d.valorLiquido),
-                        backgroundColor: '#4361ee',
-                        borderColor: '#3f37c9',
-                        borderWidth: 1
-                    }, {
-                        label: 'Consignado',
-                        data: desempenho.map(d => d.consignado),
-                        backgroundColor: '#4cc9f0',
-                        borderColor: '#4891aa',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'R$ ' + value.toLocaleString('pt-BR');
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + formatarMoeda(context.raw);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
             
-            // Gráfico de distribuição
-            const ctxDistribuicao = document.getElementById('distribuicaoChart').getContext('2d');
-            distribuicaoChart = new Chart(ctxDistribuicao, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Valor Líquido', 'Consignado'],
-                    datasets: [{
-                        data: [calcularTotaisGerais().valorLiquido, calcularTotaisGerais().consignado],
-                        backgroundColor: ['#4361ee', '#4cc9f0'],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
+            if (desempenhoChart) {
+                desempenhoChart.destroy();
+            }
+            
+            if (desempenho.length > 0) {
+                desempenhoChart = new Chart(ctxDesempenho, {
+                    type: 'bar',
+                    data: {
+                        labels: desempenho.map(d => d.nome),
+                        datasets: [
+                            {
+                                label: 'Meta',
+                                data: desempenho.map(d => d.meta),
+                                backgroundColor: 'rgba(67, 97, 238, 0.5)',
+                                borderColor: 'rgba(67, 97, 238, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Valor Líquido',
+                                data: desempenho.map(d => d.valorLiquido),
+                                backgroundColor: 'rgba(76, 201, 240, 0.5)',
+                                borderColor: 'rgba(76, 201, 240, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value.toLocaleString('pt-BR', {maximumFractionDigits: 0});
+                                    }
+                                }
+                            }
                         },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.label + ': ' + formatarMoeda(context.raw);
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + formatarMoeda(context.raw);
+                                    }
                                 }
                             }
                         }
                     }
+                });
+            }
+            
+            // Gráfico de distribuição (pizza)
+            const ctxDistribuicao = document.getElementById('distribuicaoChart').getContext('2d');
+            
+            if (distribuicaoChart) {
+                distribuicaoChart.destroy();
+            }
+            
+            if (desempenho.length > 0) {
+                const totalVendas = desempenho.reduce((acc, d) => acc + d.valorLiquido, 0);
+                
+                if (totalVendas > 0) {
+                    distribuicaoChart = new Chart(ctxDistribuicao, {
+                        type: 'pie',
+                        data: {
+                            labels: desempenho.map(d => d.nome),
+                            datasets: [{
+                                data: desempenho.map(d => d.valorLiquido),
+                                backgroundColor: [
+                                    'rgba(67, 97, 238, 0.7)',
+                                    'rgba(76, 201, 240, 0.7)',
+                                    'rgba(252, 163, 17, 0.7)',
+                                    'rgba(230, 57, 70, 0.7)',
+                                    'rgba(111, 66, 193, 0.7)',
+                                    'rgba(32, 201, 151, 0.7)',
+                                    'rgba(250, 176, 5, 0.7)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const percentage = ((value / totalVendas) * 100).toFixed(1);
+                                            return `${context.label}: ${formatarMoeda(value)} (${percentage}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
                 }
-            });
+            }
         }
 
         function atualizarListaVendedoras() {
-            const tableVendedoras = document.getElementById('vendedorasTable').querySelector('tbody');
-            tableVendedoras.innerHTML = '';
+            const tableBody = document.querySelector('#vendedorasTable tbody');
+            tableBody.innerHTML = '';
             
             if (vendedoras.length > 0) {
                 document.getElementById('emptyVendedoras').classList.add('d-none');
@@ -1079,39 +1094,57 @@
                             </button>
                         </td>
                     `;
-                    tableVendedoras.appendChild(row);
+                    tableBody.appendChild(row);
+                });
+                
+                // Adicionar event listeners para os botões
+                document.querySelectorAll('.edit-vendedora').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        editarVendedora(id);
+                    });
+                });
+                
+                document.querySelectorAll('.delete-vendedora').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        prepararExclusaoVendedora(id);
+                    });
                 });
             } else {
                 document.getElementById('emptyVendedoras').classList.remove('d-none');
                 document.getElementById('tableVendedoras').classList.add('d-none');
             }
             
-            // Atualizar dropdown de vendedoras
-            const selectVendedora = document.getElementById('vendaVendedora');
-            selectVendedora.innerHTML = '<option value="" selected>Selecione...</option>';
+            // Atualizar selects de vendedoras
+            atualizarSelectVendedoras();
+        }
+
+        function atualizarSelectVendedoras() {
+            const selectVenda = document.getElementById('vendaVendedora');
+            const selectFiltro = document.getElementById('filtroVendedora');
             
+            // Limpar selects (mantendo a primeira opção)
+            selectVenda.innerHTML = '<option value="" selected>Selecione...</option>';
+            selectFiltro.innerHTML = '<option value="todas" selected>Todas</option>';
+            
+            // Adicionar opções
             vendedoras.forEach(vendedora => {
-                const option = document.createElement('option');
-                option.value = vendedora.id;
-                option.textContent = vendedora.nome;
-                selectVendedora.appendChild(option);
-            });
-            
-            // Atualizar filtro de vendedoras nos relatórios
-            const filtroVendedora = document.getElementById('filtroVendedora');
-            filtroVendedora.innerHTML = '<option value="todas" selected>Todas</option>';
-            
-            vendedoras.forEach(vendedora => {
-                const option = document.createElement('option');
-                option.value = vendedora.id;
-                option.textContent = vendedora.nome;
-                filtroVendedora.appendChild(option);
+                const optionVenda = document.createElement('option');
+                optionVenda.value = vendedora.id;
+                optionVenda.textContent = vendedora.nome;
+                selectVenda.appendChild(optionVenda);
+                
+                const optionFiltro = document.createElement('option');
+                optionFiltro.value = vendedora.id;
+                optionFiltro.textContent = vendedora.nome;
+                selectFiltro.appendChild(optionFiltro);
             });
         }
 
         function atualizarListaVendas() {
-            const tableVendas = document.getElementById('vendasTable').querySelector('tbody');
-            tableVendas.innerHTML = '';
+            const tableBody = document.querySelector('#vendasTable tbody');
+            tableBody.innerHTML = '';
             
             if (vendas.length > 0) {
                 document.getElementById('emptyVendas').classList.add('d-none');
@@ -1122,9 +1155,12 @@
                 
                 vendasOrdenadas.forEach(venda => {
                     const vendedora = obterVendedoraPorId(venda.vendedoraId);
+                    const data = new Date(venda.data);
+                    const dataFormatada = data.toLocaleDateString('pt-BR');
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${new Date(venda.data).toLocaleDateString('pt-BR')}</td>
+                        <td>${dataFormatada}</td>
                         <td>${vendedora ? vendedora.nome : 'N/A'}</td>
                         <td>${formatarMoeda(venda.valorLiquido)}</td>
                         <td>${formatarMoeda(venda.consignado)}</td>
@@ -1139,7 +1175,22 @@
                             </button>
                         </td>
                     `;
-                    tableVendas.appendChild(row);
+                    tableBody.appendChild(row);
+                });
+                
+                // Adicionar event listeners para os botões
+                document.querySelectorAll('.edit-venda').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        editarVenda(id);
+                    });
+                });
+                
+                document.querySelectorAll('.delete-venda').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        prepararExclusaoVenda(id);
+                    });
                 });
             } else {
                 document.getElementById('emptyVendas').classList.remove('d-none');
@@ -1148,8 +1199,9 @@
         }
 
         function atualizarRelatorios() {
-            const filtroVendedora = document.getElementById('filtroVendedora').value;
-            const filtroPeriodo = document.getElementById('filtroPeriodo').value;
+            // Obter filtros
+            const vendedoraId = document.getElementById('filtroVendedora').value;
+            const periodo = document.getElementById('filtroPeriodo').value;
             const dataInicio = document.getElementById('dataInicio').value;
             const dataFim = document.getElementById('dataFim').value;
             
@@ -1157,29 +1209,30 @@
             let vendasFiltradas = [...vendas];
             
             // Filtrar por vendedora
-            if (filtroVendedora !== 'todas') {
-                vendasFiltradas = vendasFiltradas.filter(v => v.vendedoraId === filtroVendedora);
+            if (vendedoraId !== 'todas') {
+                vendasFiltradas = vendasFiltradas.filter(v => v.vendedoraId === vendedoraId);
             }
             
             // Filtrar por período
             const hoje = new Date();
             let dataInicioFiltro, dataFimFiltro;
             
-            if (filtroPeriodo === 'day') {
+            if (periodo === 'day') {
                 dataInicioFiltro = new Date(hoje);
                 dataFimFiltro = new Date(hoje);
-            } else if (filtroPeriodo === 'week') {
+            } else if (periodo === 'week') {
+                const diaSemana = hoje.getDay();
                 dataInicioFiltro = new Date(hoje);
-                dataInicioFiltro.setDate(hoje.getDate() - hoje.getDay());
+                dataInicioFiltro.setDate(hoje.getDate() - diaSemana);
                 dataFimFiltro = new Date(hoje);
-                dataFimFiltro.setDate(hoje.getDate() + (6 - hoje.getDay()));
-            } else if (filtroPeriodo === 'month') {
+                dataFimFiltro.setDate(hoje.getDate() + (6 - diaSemana));
+            } else if (periodo === 'month') {
                 dataInicioFiltro = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
                 dataFimFiltro = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-            } else if (filtroPeriodo === 'year') {
+            } else if (periodo === 'year') {
                 dataInicioFiltro = new Date(hoje.getFullYear(), 0, 1);
                 dataFimFiltro = new Date(hoje.getFullYear(), 11, 31);
-            } else if (filtroPeriodo === 'custom' && dataInicio && dataFim) {
+            } else if (periodo === 'custom' && dataInicio && dataFim) {
                 dataInicioFiltro = new Date(dataInicio);
                 dataFimFiltro = new Date(dataFim);
             } else {
@@ -1188,22 +1241,21 @@
                 dataFimFiltro = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
             }
             
-            if (dataInicioFiltro && dataFimFiltro) {
-                vendasFiltradas = vendasFiltradas.filter(v => {
-                    const dataVenda = new Date(v.data);
-                    return dataVenda >= dataInicioFiltro && dataVenda <= dataFimFiltro;
-                });
-            }
+            // Aplicar filtro de data
+            vendasFiltradas = vendasFiltradas.filter(v => {
+                const dataVenda = new Date(v.data);
+                return dataVenda >= dataInicioFiltro && dataVenda <= dataFimFiltro;
+            });
             
+            // Salvar dados filtrados para uso no PDF
             dadosFiltrados = vendasFiltradas;
             
-            // Calcular desempenho com base nas vendas filtradas
+            // Calcular desempenho
             const desempenho = calcularDesempenhoVendedoras(vendasFiltradas);
-            const totais = calcularTotaisGerais(vendasFiltradas);
             
             // Atualizar tabela de relatórios
-            const tableRelatorios = document.getElementById('reportTable').querySelector('tbody');
-            tableRelatorios.innerHTML = '';
+            const tableBody = document.querySelector('#reportTable tbody');
+            tableBody.innerHTML = '';
             
             if (desempenho.length > 0) {
                 document.getElementById('emptyRelatorios').classList.add('d-none');
@@ -1226,550 +1278,797 @@
                         <td>${formatarMoeda(d.precoMedio)}</td>
                         <td>${formatarMoeda(d.ticketMedio)}</td>
                     `;
-                    tableRelatorios.appendChild(row);
+                    tableBody.appendChild(row);
                 });
-                
-                // Adicionar linha de totais
-                const rowTotal = document.createElement('tr');
-                rowTotal.classList.add('table-primary');
-                rowTotal.innerHTML = `
-                    <td><strong>TOTAL</strong></td>
-                    <td><strong>${formatarMoeda(totais.metaTotal)}</strong></td>
-                    <td><strong>${formatarMoeda(totais.valorLiquido)}</strong></td>
-                    <td><strong>${formatarMoeda(totais.consignado)}</strong></td>
-                    <td><strong>${formatarMoeda(totais.valorLiquido + totais.consignado)}</strong></td>
-                    <td><strong>${totais.metaAtingida.toFixed(1)}%</strong></td>
-                    <td><strong>${totais.vendas}</strong></td>
-                    <td><strong>${totais.pecas}</strong></td>
-                    <td><strong>${totais.atendimentos}</strong></td>
-                    <td><strong>${formatarMoeda(totais.vendaMedia)}</strong></td>
-                    <td><strong>${totais.itensPorVenda.toFixed(1)}</strong></td>
-                    <td><strong>${formatarMoeda(totais.precoMedio)}</strong></td>
-                    <td><strong>${formatarMoeda(totais.ticketMedio)}</strong></td>
-                `;
-                tableRelatorios.appendChild(rowTotal);
             } else {
                 document.getElementById('emptyRelatorios').classList.remove('d-none');
                 document.getElementById('tableRelatorios').classList.add('d-none');
             }
             
             // Atualizar gráficos de relatórios
-            atualizarGraficosRelatorios(desempenho, totais);
+            atualizarGraficosRelatorios(desempenho);
         }
 
-        function atualizarGraficosRelatorios(desempenho, totais) {
-            // Destruir gráficos existentes
-            if (relatorioDesempenhoChart) relatorioDesempenhoChart.destroy();
-            if (relatorioDistribuicaoChart) relatorioDistribuicaoChart.destroy();
-            
-            // Gráfico de desempenho
+        function atualizarGraficosRelatorios(desempenho) {
+            // Gráfico de desempenho (barras)
             const ctxDesempenho = document.getElementById('relatorioDesempenhoChart').getContext('2d');
-            relatorioDesempenhoChart = new Chart(ctxDesempenho, {
-                type: 'bar',
-                data: {
-                    labels: desempenho.map(d => d.nome),
-                    datasets: [{
-                        label: 'Meta',
-                        data: desempenho.map(d => d.meta),
-                        backgroundColor: '#6c757d',
-                        borderColor: '#5a6268',
-                        borderWidth: 1
-                    }, {
-                        label: 'Valor Líquido',
-                        data: desempenho.map(d => d.valorLiquido),
-                        backgroundColor: '#4361ee',
-                        borderColor: '#3f37c9',
-                        borderWidth: 1
-                    }, {
-                        label: 'Consignado',
-                        data: desempenho.map(d => d.consignado),
-                        backgroundColor: '#4cc9f0',
-                        borderColor: '#4891aa',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'R$ ' + value.toLocaleString('pt-BR');
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + formatarMoeda(context.raw);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
             
-            // Gráfico de distribuição
-            const ctxDistribuicao = document.getElementById('relatorioDistribuicaoChart').getContext('2d');
-            relatorioDistribuicaoChart = new Chart(ctxDistribuicao, {
-                type: 'pie',
-                data: {
-                    labels: desempenho.map(d => d.nome),
-                    datasets: [{
-                        data: desempenho.map(d => d.valorLiquido),
-                        backgroundColor: [
-                            '#4361ee', '#4cc9f0', '#7209b7', '#f72585', '#560bad',
-                            '#480ca8', '#3a0ca3', '#3f37c9', '#4361ee', '#4895ef'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
+            if (relatorioDesempenhoChart) {
+                relatorioDesempenhoChart.destroy();
+            }
+            
+            if (desempenho.length > 0) {
+                relatorioDesempenhoChart = new Chart(ctxDesempenho, {
+                    type: 'bar',
+                    data: {
+                        labels: desempenho.map(d => d.nome),
+                        datasets: [
+                            {
+                                label: 'Meta',
+                                data: desempenho.map(d => d.meta),
+                                backgroundColor: 'rgba(67, 97, 238, 0.5)',
+                                borderColor: 'rgba(67, 97, 238, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Valor Líquido',
+                                data: desempenho.map(d => d.valorLiquido),
+                                backgroundColor: 'rgba(76, 201, 240, 0.5)',
+                                borderColor: 'rgba(76, 201, 240, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return 'R$ ' + value.toLocaleString('pt-BR', {maximumFractionDigits: 0});
+                                    }
+                                }
+                            }
                         },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.raw;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = Math.round((value / total) * 100);
-                                    return `${context.label}: ${formatarMoeda(value)} (${percentage}%)`;
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + formatarMoeda(context.raw);
+                                    }
                                 }
                             }
                         }
                     }
+                });
+            }
+            
+            // Gráfico de distribuição (pizza)
+            const ctxDistribuicao = document.getElementById('relatorioDistribuicaoChart').getContext('2d');
+            
+            if (relatorioDistribuicaoChart) {
+                relatorioDistribuicaoChart.destroy();
+            }
+            
+            if (desempenho.length > 0) {
+                const totalVendas = desempenho.reduce((acc, d) => acc + d.valorLiquido, 0);
+                
+                if (totalVendas > 0) {
+                    relatorioDistribuicaoChart = new Chart(ctxDistribuicao, {
+                        type: 'pie',
+                        data: {
+                            labels: desempenho.map(d => d.nome),
+                            datasets: [{
+                                data: desempenho.map(d => d.valorLiquido),
+                                backgroundColor: [
+                                    'rgba(67, 97, 238, 0.7)',
+                                    'rgba(76, 201, 240, 0.7)',
+                                    'rgba(252, 163, 17, 0.7)',
+                                    'rgba(230, 57, 70, 0.7)',
+                                    'rgba(111, 66, 193, 0.7)',
+                                    'rgba(32, 201, 151, 0.7)',
+                                    'rgba(250, 176, 5, 0.7)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.raw;
+                                            const percentage = ((value / totalVendas) * 100).toFixed(1);
+                                            return `${context.label}: ${formatarMoeda(value)} (${percentage}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
                 }
-            });
+            }
         }
 
-        function exportarDados() {
+        function adicionarVendedora() {
+            const nome = document.getElementById('vendedoraNome').value;
+            const meta = parseFloat(document.getElementById('vendedoraMeta').value);
+            const telefone = document.getElementById('vendedoraTelefone').value;
+            const email = document.getElementById('vendedoraEmail').value;
+            
+            if (!nome || isNaN(meta) || !telefone) {
+                alert('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+            
+            const novaVendedora = {
+                id: Date.now().toString(),
+                nome,
+                meta,
+                telefone,
+                email
+            };
+            
+            vendedoras.push(novaVendedora);
+            localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
+            
+            // Fechar modal e limpar formulário
+            bootstrap.Modal.getInstance(document.getElementById('addVendedoraModal')).hide();
+            document.getElementById('formVendedora').reset();
+            
+            // Atualizar listas
+            atualizarListaVendedoras();
+            atualizarDashboard();
+            
+            alert('Vendedora adicionada com sucesso!');
+        }
+
+        function editarVendedora(id) {
+            const vendedora = vendedoras.find(v => v.id === id);
+            
+            if (!vendedora) {
+                alert('Vendedora não encontrada.');
+                return;
+            }
+            
+            // Preencher formulário
+            document.getElementById('vendedoraId').value = vendedora.id;
+            document.getElementById('vendedoraNome').value = vendedora.nome;
+            document.getElementById('vendedoraMeta').value = vendedora.meta;
+            document.getElementById('vendedoraTelefone').value = vendedora.telefone;
+            document.getElementById('vendedoraEmail').value = vendedora.email || '';
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('addVendedoraModal'));
+            modal.show();
+            
+            // Alterar comportamento do botão salvar
+            document.getElementById('salvarVendedora').onclick = function() {
+                salvarEdicaoVendedora();
+            };
+        }
+
+        function salvarEdicaoVendedora() {
+            const id = document.getElementById('vendedoraId').value;
+            const nome = document.getElementById('vendedoraNome').value;
+            const meta = parseFloat(document.getElementById('vendedoraMeta').value);
+            const telefone = document.getElementById('vendedoraTelefone').value;
+            const email = document.getElementById('vendedoraEmail').value;
+            
+            if (!nome || isNaN(meta) || !telefone) {
+                alert('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+            
+            const index = vendedoras.findIndex(v => v.id === id);
+            
+            if (index === -1) {
+                alert('Vendedora não encontrada.');
+                return;
+            }
+            
+            vendedoras[index] = {
+                ...vendedoras[index],
+                nome,
+                meta,
+                telefone,
+                email
+            };
+            
+            localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
+            
+            // Fechar modal e limpar formulário
+            bootstrap.Modal.getInstance(document.getElementById('addVendedoraModal')).hide();
+            document.getElementById('formVendedora').reset();
+            document.getElementById('vendedoraId').value = '';
+            
+            // Restaurar comportamento padrão do botão salvar
+            document.getElementById('salvarVendedora').onclick = adicionarVendedora;
+            
+            // Atualizar listas
+            atualizarListaVendedoras();
+            atualizarDashboard();
+            
+            alert('Vendedora atualizada com sucesso!');
+        }
+
+        function prepararExclusaoVendedora(id) {
+            const vendedora = vendedoras.find(v => v.id === id);
+            
+            if (!vendedora) {
+                alert('Vendedora não encontrada.');
+                return;
+            }
+            
+            // Verificar se há vendas associadas
+            const vendasVendedora = vendas.filter(v => v.vendedoraId === id);
+            
+            if (vendasVendedora.length > 0) {
+                alert('Não é possível excluir esta vendedora porque existem vendas associadas a ela.');
+                return;
+            }
+            
+            itemParaExcluir = id;
+            tipoItemParaExcluir = 'vendedora';
+            
+            document.getElementById('deleteMessage').textContent = 
+                `Tem certeza que deseja excluir a vendedora "${vendedora.nome}"? Esta ação não pode ser desfeita.`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+            modal.show();
+        }
+
+        function adicionarVenda() {
+            const data = document.getElementById('vendaData').value;
+            const vendedoraId = document.getElementById('vendaVendedora').value;
+            const valorLiquido = parseFloat(document.getElementById('vendaValorLiquido').value);
+            const consignado = parseFloat(document.getElementById('vendaConsignado').value);
+            const pecas = parseInt(document.getElementById('vendaPecas').value);
+            const atendimentos = parseInt(document.getElementById('vendaAtendimentos').value);
+            
+            if (!data || !vendedoraId || isNaN(valorLiquido) || isNaN(consignado) || isNaN(pecas) || isNaN(atendimentos)) {
+                alert('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+            
+            const novaVenda = {
+                id: Date.now().toString(),
+                data,
+                vendedoraId,
+                valorLiquido,
+                consignado,
+                pecas,
+                atendimentos
+            };
+            
+            vendas.push(novaVenda);
+            localStorage.setItem('vendas', JSON.stringify(vendas));
+            
+            // Fechar modal e limpar formulário
+            bootstrap.Modal.getInstance(document.getElementById('addVendaModal')).hide();
+            document.getElementById('formVenda').reset();
+            
+            // Atualizar listas
+            atualizarListaVendas();
+            atualizarDashboard();
+            
+            alert('Venda registrada com sucesso!');
+        }
+
+        function editarVenda(id) {
+            const venda = vendas.find(v => v.id === id);
+            
+            if (!venda) {
+                alert('Venda não encontrada.');
+                return;
+            }
+            
+            // Preencher formulário
+            document.getElementById('vendaId').value = venda.id;
+            document.getElementById('vendaData').value = venda.data;
+            document.getElementById('vendaVendedora').value = venda.vendedoraId;
+            document.getElementById('vendaValorLiquido').value = venda.valorLiquido;
+            document.getElementById('vendaConsignado').value = venda.consignado;
+            document.getElementById('vendaPecas').value = venda.pecas;
+            document.getElementById('vendaAtendimentos').value = venda.atendimentos;
+            
+            // Abrir modal
+            const modal = new bootstrap.Modal(document.getElementById('addVendaModal'));
+            modal.show();
+            
+            // Alterar comportamento do botão salvar
+            document.getElementById('salvarVenda').onclick = function() {
+                salvarEdicaoVenda();
+            };
+        }
+
+        function salvarEdicaoVenda() {
+            const id = document.getElementById('vendaId').value;
+            const data = document.getElementById('vendaData').value;
+            const vendedoraId = document.getElementById('vendaVendedora').value;
+            const valorLiquido = parseFloat(document.getElementById('vendaValorLiquido').value);
+            const consignado = parseFloat(document.getElementById('vendaConsignado').value);
+            const pecas = parseInt(document.getElementById('vendaPecas').value);
+            const atendimentos = parseInt(document.getElementById('vendaAtendimentos').value);
+            
+            if (!data || !vendedoraId || isNaN(valorLiquido) || isNaN(consignado) || isNaN(pecas) || isNaN(atendimentos)) {
+                alert('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+            
+            const index = vendas.findIndex(v => v.id === id);
+            
+            if (index === -1) {
+                alert('Venda não encontrada.');
+                return;
+            }
+            
+            vendas[index] = {
+                ...vendas[index],
+                data,
+                vendedoraId,
+                valorLiquido,
+                consignado,
+                pecas,
+                atendimentos
+            };
+            
+            localStorage.setItem('vendas', JSON.stringify(vendas));
+            
+            // Fechar modal e limpar formulário
+            bootstrap.Modal.getInstance(document.getElementById('addVendaModal')).hide();
+            document.getElementById('formVenda').reset();
+            document.getElementById('vendaId').value = '';
+            
+            // Restaurar comportamento padrão do botão salvar
+            document.getElementById('salvarVenda').onclick = adicionarVenda;
+            
+            // Atualizar listas
+            atualizarListaVendas();
+            atualizarDashboard();
+            
+            alert('Venda atualizada com sucesso!');
+        }
+
+        function prepararExclusaoVenda(id) {
+            const venda = vendas.find(v => v.id === id);
+            
+            if (!venda) {
+                alert('Venda não encontrada.');
+                return;
+            }
+            
+            const vendedora = obterVendedoraPorId(venda.vendedoraId);
+            const data = new Date(venda.data);
+            const dataFormatada = data.toLocaleDateString('pt-BR');
+            
+            itemParaExcluir = id;
+            tipoItemParaExcluir = 'venda';
+            
+            document.getElementById('deleteMessage').textContent = 
+                `Tem certeza que deseja excluir a venda de ${dataFormatada} da vendedora ${vendedora ? vendedora.nome : 'N/A'}? Esta ação não pode ser desfeita.`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+            modal.show();
+        }
+
+        function excluirItem() {
+            if (tipoItemParaExcluir === 'vendedora') {
+                vendedoras = vendedoras.filter(v => v.id !== itemParaExcluir);
+                localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
+                atualizarListaVendedoras();
+                atualizarDashboard();
+                alert('Vendedora excluída com sucesso!');
+            } else if (tipoItemParaExcluir === 'venda') {
+                vendas = vendas.filter(v => v.id !== itemParaExcluir);
+                localStorage.setItem('vendas', JSON.stringify(vendas));
+                atualizarListaVendas();
+                atualizarDashboard();
+                alert('Venda excluída com sucesso!');
+            }
+            
+            itemParaExcluir = null;
+            tipoItemParaExcluir = '';
+            
+            bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal')).hide();
+        }
+
+        function exportarBackup() {
             const dados = {
-                vendedoras: vendedoras,
-                vendas: vendas,
+                vendedoras,
+                vendas,
                 exportadoEm: new Date().toISOString()
             };
             
-            const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
+            const dadosStr = JSON.stringify(dados, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dadosStr);
             
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `salescontrol_backup_${formatarData(new Date())}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            const exportFileDefaultName = `salescontrol_backup_${formatarData(new Date())}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            alert('Backup exportado com sucesso!');
         }
 
-        function importarDados(arquivo) {
+        function importarBackup() {
+            const fileInput = document.getElementById('backupFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Por favor, selecione um arquivo de backup.');
+                return;
+            }
+            
             const reader = new FileReader();
             
             reader.onload = function(e) {
                 try {
                     const dados = JSON.parse(e.target.result);
                     
-                    if (dados.vendedoras && dados.vendas) {
-                        vendedoras = dados.vendedoras;
-                        vendas = dados.vendas;
-                        
-                        localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
-                        localStorage.setItem('vendas', JSON.stringify(vendas));
-                        
-                        // Atualizar todas as visualizações
-                        atualizarDashboard();
-                        atualizarListaVendedoras();
-                        atualizarListaVendas();
-                        atualizarRelatorios();
-                        
-                        alert('Dados importados com sucesso!');
-                    } else {
-                        throw new Error('Formato de arquivo inválido');
+                    // Validar dados
+                    if (!dados.vendedoras || !dados.vendas) {
+                        throw new Error('Formato de arquivo inválido.');
                     }
+                    
+                    // Substituir dados atuais
+                    vendedoras = dados.vendedoras;
+                    vendas = dados.vendas;
+                    
+                    // Salvar no localStorage
+                    localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
+                    localStorage.setItem('vendas', JSON.stringify(vendas));
+                    
+                    // Atualizar interface
+                    atualizarListaVendedoras();
+                    atualizarListaVendas();
+                    atualizarDashboard();
+                    
+                    // Fechar modal
+                    bootstrap.Modal.getInstance(document.getElementById('backupModal')).hide();
+                    
+                    alert('Backup importado com sucesso!');
                 } catch (error) {
-                    alert('Erro ao importar dados: ' + error.message);
+                    console.error(error);
+                    alert('Erro ao importar backup. O arquivo pode estar corrompido ou em formato inválido.');
                 }
             };
             
-            reader.readAsText(arquivo);
+            reader.readAsText(file);
         }
 
-        function gerarPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+        function abrirCalculadora(fieldId) {
+            currentCalculatorField = fieldId;
+            calculatorValue = document.getElementById(fieldId).value || '';
+            document.getElementById('calculatorDisplay').value = calculatorValue;
             
-            // Título
-            doc.setFontSize(20);
-            doc.text('Relatório de Vendas - SalesControl', 105, 15, { align: 'center' });
-            
-            // Data de emissão
-            doc.setFontSize(12);
-            doc.text(`Emitido em: ${new Date().toLocaleDateString('pt-BR')}`, 105, 22, { align: 'center' });
-            
-            // Filtros aplicados
-            const filtroVendedora = document.getElementById('filtroVendedora');
-            const vendedoraSelecionada = filtroVendedora.options[filtroVendedora.selectedIndex].text;
-            
-            const filtroPeriodo = document.getElementById('filtroPeriodo');
-            const periodoSelecionado = filtroPeriodo.options[filtroPeriodo.selectedIndex].text;
-            
-            doc.setFontSize(10);
-            doc.text(`Vendedora: ${vendedoraSelecionada} | Período: ${periodoSelecionado}`, 105, 28, { align: 'center' });
-            
-            // Dados da tabela
-            const table = document.getElementById('reportTable');
-            const headers = [];
-            const rows = [];
-            
-            // Cabeçalhos
-            for (let i = 0; i < table.rows[0].cells.length; i++) {
-                headers.push(table.rows[0].cells[i].textContent);
-            }
-            
-            // Dados
-            for (let i = 1; i < table.rows.length; i++) {
-                const row = [];
-                for (let j = 0; j < table.rows[i].cells.length; j++) {
-                    row.push(table.rows[i].cells[j].textContent);
+            const modal = new bootstrap.Modal(document.getElementById('calculatorModal'));
+            modal.show();
+        }
+
+        function processarCalculadora(valor) {
+            if (valor === 'clear') {
+                calculatorValue = '';
+            } else if (valor === 'calculate') {
+                try {
+                    // Avaliar expressão matemática (com cuidado para evitar injeção de código)
+                    calculatorValue = String(eval(calculatorValue.replace(/[^0-9+\-*/().]/g, '')));
+                } catch (e) {
+                    calculatorValue = 'Erro';
                 }
-                rows.push(row);
+            } else {
+                calculatorValue += valor;
             }
             
-            // Gerar tabela
+            document.getElementById('calculatorDisplay').value = calculatorValue;
+        }
+
+        function aplicarResultadoCalculadora() {
+            if (calculatorValue !== 'Erro') {
+                document.getElementById(currentCalculatorField).value = calculatorValue;
+            }
+            
+            bootstrap.Modal.getInstance(document.getElementById('calculatorModal')).hide();
+        }
+
+        function gerarRelatorioPDF() {
+            // Verificar se há dados para gerar o relatório
+            if (dadosFiltrados.length === 0) {
+                alert('Não há dados para gerar o relatório.');
+                return;
+            }
+            
+            // Criar um novo documento PDF em modo paisagem
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            // Adicionar título
+            doc.setFontSize(18);
+            doc.text('Relatório de Vendas - SalesControl', 15, 15);
+            
+            // Adicionar data de geração
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 15, 22);
+            
+            // Calcular dados para o relatório
+            const desempenho = calcularDesempenhoVendedoras(dadosFiltrados);
+            
+            // Adicionar tabela de desempenho
+            const tableColumn = ["Vendedora", "Meta", "Valor Líquido", "Consignado", "Total", "Meta Atingida"];
+            const tableRows = [];
+            
+            desempenho.forEach(d => {
+                const row = [
+                    d.nome,
+                    formatarMoeda(d.meta),
+                    formatarMoeda(d.valorLiquido),
+                    formatarMoeda(d.consignado),
+                    formatarMoeda(d.total),
+                    `${d.metaAtingida.toFixed(1)}%`
+                ];
+                tableRows.push(row);
+            });
+            
+            // Adicionar linha de totais
+            const totalMeta = desempenho.reduce((acc, d) => acc + d.meta, 0);
+            const totalValorLiquido = desempenho.reduce((acc, d) => acc + d.valorLiquido, 0);
+            const totalConsignado = desempenho.reduce((acc, d) => acc + d.consignado, 0);
+            const totalGeral = totalValorLiquido + totalConsignado;
+            const metaAtingidaGeral = totalMeta > 0 ? (totalValorLiquido / totalMeta) * 100 : 0;
+            
+            tableRows.push([
+                "TOTAL",
+                formatarMoeda(totalMeta),
+                formatarMoeda(totalValorLiquido),
+                formatarMoeda(totalConsignado),
+                formatarMoeda(totalGeral),
+                `${metaAtingidaGeral.toFixed(1)}%`
+            ]);
+            
+            // Gerar a tabela
             doc.autoTable({
-                head: [headers],
-                body: rows,
-                startY: 35,
+                head: [tableColumn],
+                body: tableRows,
+                startY: 30,
                 theme: 'grid',
                 styles: { fontSize: 8 },
-                headStyles: { fillColor: [67, 97, 238] }
+                headStyles: { fillColor: [67, 97, 238] },
+                foot: [tableRows[tableRows.length - 1]],
+                footStyles: { fillColor: [76, 201, 240] }
             });
             
-            // Salvar PDF
-            doc.save(`relatorio_vendas_${formatarData(new Date())}.pdf`);
-        }
-
-        function inicializarCalculadora() {
-            document.querySelectorAll('.calculator-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    currentCalculatorField = this.getAttribute('data-field');
-                    calculatorValue = document.getElementById(currentCalculatorField).value || '';
-                    document.getElementById('calculatorDisplay').value = calculatorValue;
-                    
-                    const calculatorModal = new bootstrap.Modal(document.getElementById('calculatorModal'));
-                    calculatorModal.show();
-                });
-            });
+            // Adicionar gráficos (após a tabela)
+            const finalY = doc.lastAutoTable.finalY + 10;
             
-            document.querySelectorAll('[data-calc]').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const action = this.getAttribute('data-calc');
-                    
-                    if (action === 'clear') {
-                        calculatorValue = '';
-                    } else if (action === 'calculate') {
-                        try {
-                            calculatorValue = eval(calculatorValue).toString();
-                        } catch (e) {
-                            calculatorValue = 'Erro';
+            // Adicionar título para os gráficos
+            doc.setFontSize(14);
+            doc.text('Gráficos de Desempenho', 15, finalY);
+            
+            // Criar elementos canvas para os gráficos
+            const canvas1 = document.createElement('canvas');
+            const canvas2 = document.createElement('canvas');
+            
+            // Definir dimensões para os gráficos
+            canvas1.width = 400;
+            canvas1.height = 300;
+            canvas2.width = 400;
+            canvas2.height = 300;
+            
+            // Renderizar gráficos nos canvases
+            const ctx1 = canvas1.getContext('2d');
+            const ctx2 = canvas2.getContext('2d');
+            
+            // Gráfico de barras (desempenho)
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: desempenho.map(d => d.nome),
+                    datasets: [
+                        {
+                            label: 'Meta',
+                            data: desempenho.map(d => d.meta),
+                            backgroundColor: 'rgba(67, 97, 238, 0.5)',
+                            borderColor: 'rgba(67, 97, 238, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Valor Líquido',
+                            data: desempenho.map(d => d.valorLiquido),
+                            backgroundColor: 'rgba(76, 201, 240, 0.5)',
+                            borderColor: 'rgba(76, 201, 240, 1)',
+                            borderWidth: 1
                         }
-                    } else {
-                        calculatorValue += action;
+                    ]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR', {maximumFractionDigits: 0});
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Desempenho: Meta vs Valor Líquido'
+                        },
+                        legend: {
+                            position: 'top'
+                        }
                     }
-                    
-                    document.getElementById('calculatorDisplay').value = calculatorValue;
-                });
+                }
             });
             
-            document.getElementById('applyCalculatorResult').addEventListener('click', function() {
-                if (currentCalculatorField && calculatorValue !== 'Erro') {
-                    document.getElementById(currentCalculatorField).value = calculatorValue;
-                    const calculatorModal = bootstrap.Modal.getInstance(document.getElementById('calculatorModal'));
-                    calculatorModal.hide();
+            // Gráfico de pizza (distribuição)
+            new Chart(ctx2, {
+                type: 'pie',
+                data: {
+                    labels: desempenho.map(d => d.nome),
+                    datasets: [{
+                        data: desempenho.map(d => d.valorLiquido),
+                        backgroundColor: [
+                            'rgba(67, 97, 238, 0.7)',
+                            'rgba(76, 201, 240, 0.7)',
+                            'rgba(252, 163, 17, 0.7)',
+                            'rgba(230, 57, 70, 0.7)',
+                            'rgba(111, 66, 193, 0.7)',
+                            'rgba(32, 201, 151, 0.7)',
+                            'rgba(250, 176, 5, 0.7)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Distribuição de Vendas por Vendedora'
+                        },
+                        legend: {
+                            position: 'right'
+                        }
+                    }
                 }
+            });
+            
+            // Converter os canvases em imagens e adicionar ao PDF
+            Promise.all([
+                new Promise(resolve => {
+                    html2canvas(canvas1).then(canvas => {
+                        const imgData = canvas.toDataURL('image/jpeg', 0.7);
+                        resolve(imgData);
+                    });
+                }),
+                new Promise(resolve => {
+                    html2canvas(canvas2).then(canvas => {
+                        const imgData = canvas.toDataURL('image/jpeg', 0.7);
+                        resolve(imgData);
+                    });
+                })
+            ]).then(images => {
+                // Adicionar o primeiro gráfico
+                doc.addImage(images[0], 'JPEG', 15, finalY + 10, 120, 90);
+                
+                // Adicionar o segundo gráfico
+                doc.addImage(images[1], 'JPEG', 150, finalY + 10, 120, 90);
+                
+                // Salvar o PDF
+                doc.save(`relatorio_vendas_${formatarData(new Date())}.pdf`);
             });
         }
 
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
-            // Inicializar data atual no formulário de venda
+            // Configurar data atual no campo de data da venda
             document.getElementById('vendaData').value = formatarData(new Date());
             
-            // Atualizar todas as visualizações
-            atualizarDashboard();
+            // Inicializar listas
             atualizarListaVendedoras();
             atualizarListaVendas();
-            atualizarRelatorios();
+            atualizarDashboard();
             
-            // Inicializar calculadora
-            inicializarCalculadora();
-            
-            // Event Listeners para navegação
+            // Configurar navegação
             document.getElementById('dashboardLink').addEventListener('click', function(e) {
                 e.preventDefault();
                 mostrarSecao('dashboardSection');
-            });
-            
-            document.getElementById('vendedorasLink').addEventListener('click', function(e) {
-                e.preventDefault();
-                mostrarSecao('vendedorasSection');
-            });
-            
-            document.getElementById('vendasLink').addEventListener('click', function(e) {
-                e.preventDefault();
-                mostrarSecao('vendasSection');
-            });
-            
-            document.getElementById('relatoriosLink').addEventListener('click', function(e) {
-                e.preventDefault();
-                mostrarSecao('relatoriosSection');
-            });
-            
-            document.getElementById('configuracoesLink').addEventListener('click', function(e) {
-                e.preventDefault();
-                mostrarSecao('configuracoesSection');
+                atualizarLinksAtivos(this);
             });
             
             document.getElementById('dashboardBrandLink').addEventListener('click', function(e) {
                 e.preventDefault();
                 mostrarSecao('dashboardSection');
+                atualizarLinksAtivos(document.getElementById('dashboardLink'));
             });
             
-            // Event Listeners para formulários
-            document.getElementById('salvarVendedora').addEventListener('click', function() {
-                const id = document.getElementById('vendedoraId').value;
-                const nome = document.getElementById('vendedoraNome').value;
-                const meta = parseFloat(document.getElementById('vendedoraMeta').value);
-                const telefone = document.getElementById('vendedoraTelefone').value;
-                const email = document.getElementById('vendedoraEmail').value;
-                
-                if (id) {
-                    // Editar vendedora existente
-                    const index = vendedoras.findIndex(v => v.id === id);
-                    if (index !== -1) {
-                        vendedoras[index] = {
-                            ...vendedoras[index],
-                            nome,
-                            meta,
-                            telefone,
-                            email
-                        };
-                    }
-                } else {
-                    // Adicionar nova vendedora
-                    vendedoras.push({
-                        id: Date.now().toString(),
-                        nome,
-                        meta,
-                        telefone,
-                        email
-                    });
-                }
-                
-                localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
-                atualizarListaVendedoras();
-                atualizarDashboard();
+            document.getElementById('vendedorasLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                mostrarSecao('vendedorasSection');
+                atualizarLinksAtivos(this);
+            });
+            
+            document.getElementById('vendasLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                mostrarSecao('vendasSection');
+                atualizarLinksAtivos(this);
+            });
+            
+            document.getElementById('relatoriosLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                mostrarSecao('relatoriosSection');
+                atualizarLinksAtivos(this);
                 atualizarRelatorios();
-                
-                bootstrap.Modal.getInstance(document.getElementById('addVendedoraModal')).hide();
-                document.getElementById('formVendedora').reset();
-                document.getElementById('vendedoraId').value = '';
             });
             
-            document.getElementById('salvarVenda').addEventListener('click', function() {
-                const id = document.getElementById('vendaId').value;
-                const data = document.getElementById('vendaData').value;
-                const vendedoraId = document.getElementById('vendaVendedora').value;
-                const valorLiquido = parseFloat(document.getElementById('vendaValorLiquido').value);
-                const consignado = parseFloat(document.getElementById('vendaConsignado').value);
-                const pecas = parseInt(document.getElementById('vendaPecas').value);
-                const atendimentos = parseInt(document.getElementById('vendaAtendimentos').value);
-                
-                if (id) {
-                    // Editar venda existente
-                    const index = vendas.findIndex(v => v.id === id);
-                    if (index !== -1) {
-                        vendas[index] = {
-                            ...vendas[index],
-                            data,
-                            vendedoraId,
-                            valorLiquido,
-                            consignado,
-                            pecas,
-                            atendimentos
-                        };
-                    }
-                } else {
-                    // Adicionar nova venda
-                    vendas.push({
-                        id: Date.now().toString(),
-                        data,
-                        vendedoraId,
-                        valorLiquido,
-                        consignado,
-                        pecas,
-                        atendimentos
-                    });
-                }
-                
-                localStorage.setItem('vendas', JSON.stringify(vendas));
-                atualizarListaVendas();
-                atualizarDashboard();
-                atualizarRelatorios();
-                
-                bootstrap.Modal.getInstance(document.getElementById('addVendaModal')).hide();
-                document.getElementById('formVenda').reset();
-                document.getElementById('vendaId').value = '';
-                document.getElementById('vendaData').value = formatarData(new Date());
+            document.getElementById('configuracoesLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                mostrarSecao('configuracoesSection');
+                atualizarLinksAtivos(this);
             });
             
-            // Event Listeners para botões de edição e exclusão (delegação de eventos)
-            document.addEventListener('click', function(e) {
-                // Editar vendedora
-                if (e.target.closest('.edit-vendedora')) {
-                    const id = e.target.closest('.edit-vendedora').getAttribute('data-id');
-                    const vendedora = obterVendedoraPorId(id);
-                    
-                    if (vendedora) {
-                        document.getElementById('vendedoraId').value = vendedora.id;
-                        document.getElementById('vendedoraNome').value = vendedora.nome;
-                        document.getElementById('vendedoraMeta').value = vendedora.meta;
-                        document.getElementById('vendedoraTelefone').value = vendedora.telefone;
-                        document.getElementById('vendedoraEmail').value = vendedora.email || '';
-                        
-                        const modal = new bootstrap.Modal(document.getElementById('addVendedoraModal'));
-                        modal.show();
-                    }
-                }
-                
-                // Excluir vendedora
-                if (e.target.closest('.delete-vendedora')) {
-                    const id = e.target.closest('.delete-vendedora').getAttribute('data-id');
-                    const vendedora = obterVendedoraPorId(id);
-                    
-                    if (vendedora) {
-                        itemParaExcluir = vendedora;
-                        tipoItemParaExcluir = 'vendedora';
-                        
-                        document.getElementById('deleteMessage').textContent = 
-                            `Tem certeza que deseja excluir a vendedora "${vendedora.nome}"? Todas as vendas associadas a ela também serão excluídas.`;
-                        
-                        const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-                        modal.show();
-                    }
-                }
-                
-                // Editar venda
-                if (e.target.closest('.edit-venda')) {
-                    const id = e.target.closest('.edit-venda').getAttribute('data-id');
-                    const venda = vendas.find(v => v.id === id);
-                    
-                    if (venda) {
-                        document.getElementById('vendaId').value = venda.id;
-                        document.getElementById('vendaData').value = venda.data;
-                        document.getElementById('vendaVendedora').value = venda.vendedoraId;
-                        document.getElementById('vendaValorLiquido').value = venda.valorLiquido;
-                        document.getElementById('vendaConsignado').value = venda.consignado;
-                        document.getElementById('vendaPecas').value = venda.pecas;
-                        document.getElementById('vendaAtendimentos').value = venda.atendimentos;
-                        
-                        const modal = new bootstrap.Modal(document.getElementById('addVendaModal'));
-                        modal.show();
-                    }
-                }
-                
-                // Excluir venda
-                if (e.target.closest('.delete-venda')) {
-                    const id = e.target.closest('.delete-venda').getAttribute('data-id');
-                    const venda = vendas.find(v => v.id === id);
-                    
-                    if (venda) {
-                        itemParaExcluir = venda;
-                        tipoItemParaExcluir = 'venda';
-                        
-                        const vendedora = obterVendedoraPorId(venda.vendedoraId);
-                        const vendedoraNome = vendedora ? vendedora.nome : 'N/A';
-                        
-                        document.getElementById('deleteMessage').textContent = 
-                            `Tem certeza que deseja excluir a venda de ${vendedoraNome} no valor de ${formatarMoeda(venda.valorLiquido)}?`;
-                        
-                        const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-                        modal.show();
-                    }
-                }
+            // Configurar formulários
+            document.getElementById('salvarVendedora').addEventListener('click', adicionarVendedora);
+            document.getElementById('salvarVenda').addEventListener('click', adicionarVenda);
+            
+            // Configurar botão de confirmar exclusão
+            document.getElementById('confirmDelete').addEventListener('click', excluirItem);
+            
+            // Configurar filtro de período no dashboard
+            document.getElementById('periodFilter').addEventListener('change', atualizarDashboard);
+            
+            // Configurar filtros de relatório
+            document.getElementById('filtroPeriodo').addEventListener('change', function() {
+                const isCustom = this.value === 'custom';
+                document.getElementById('dataInicio').disabled = !isCustom;
+                document.getElementById('dataFim').disabled = !isCustom;
             });
             
-            // Confirmar exclusão
-            document.getElementById('confirmDelete').addEventListener('click', function() {
-                if (itemParaExcluir && tipoItemParaExcluir) {
-                    if (tipoItemParaExcluir === 'vendedora') {
-                        // Excluir vendedora e suas vendas
-                        vendedoras = vendedoras.filter(v => v.id !== itemParaExcluir.id);
-                        vendas = vendas.filter(v => v.vendedoraId !== itemParaExcluir.id);
-                    } else if (tipoItemParaExcluir === 'venda') {
-                        // Excluir apenas a venda
-                        vendas = vendas.filter(v => v.id !== itemParaExcluir.id);
-                    }
-                    
-                    localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
-                    localStorage.setItem('vendas', JSON.stringify(vendas));
-                    
-                    atualizarDashboard();
-                    atualizarListaVendedoras();
-                    atualizarListaVendas();
-                    atualizarRelatorios();
-                    
-                    bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal')).hide();
-                    itemParaExcluir = null;
-                    tipoItemParaExcluir = '';
-                }
-            });
-            
-            // Filtros de relatório
             document.getElementById('aplicarFiltro').addEventListener('click', atualizarRelatorios);
             
-            document.getElementById('filtroPeriodo').addEventListener('change', function() {
-                const customDates = document.getElementById('filtroPeriodo').value === 'custom';
-                document.getElementById('dataInicio').disabled = !customDates;
-                document.getElementById('dataFim').disabled = !customDates;
+            // Configurar backup
+            document.getElementById('exportBackup').addEventListener('click', exportarBackup);
+            document.getElementById('importBackup').addEventListener('click', importarBackup);
+            
+            // Configurar calculadora
+            document.querySelectorAll('.calculator-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const fieldId = this.getAttribute('data-field');
+                    abrirCalculadora(fieldId);
+                });
             });
             
-            // Backup de dados
-            document.getElementById('exportBackup').addEventListener('click', exportarDados);
-            
-            document.getElementById('importBackup').addEventListener('click', function() {
-                const fileInput = document.getElementById('backupFile');
-                if (fileInput.files.length > 0) {
-                    importarDados(fileInput.files[0]);
-                } else {
-                    alert('Por favor, selecione um arquivo de backup.');
-                }
+            document.querySelectorAll('[data-calc]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const valor = this.getAttribute('data-calc');
+                    processarCalculadora(valor);
+                });
             });
             
-            // Gerar PDF
-            document.getElementById('generatePdf').addEventListener('click', gerarPDF);
+            document.getElementById('applyCalculatorResult').addEventListener('click', aplicarResultadoCalculadora);
             
-            // Limpar formulários ao fechar modais
-            document.getElementById('addVendedoraModal').addEventListener('hidden.bs.modal', function() {
-                document.getElementById('formVendedora').reset();
-                document.getElementById('vendedoraId').value = '';
-            });
+            // Configurar geração de PDF
+            document.getElementById('generatePdf').addEventListener('click', gerarRelatorioPDF);
             
-            document.getElementById('addVendaModal').addEventListener('hidden.bs.modal', function() {
-                document.getElementById('formVenda').reset();
-                document.getElementById('vendaId').value = '';
-                document.getElementById('vendaData').value = formatarData(new Date());
-            });
+            // Inicializar filtro de período como custom desabilitado
+            document.getElementById('dataInicio').disabled = true;
+            document.getElementById('dataFim').disabled = true;
         });
 
         function mostrarSecao(secaoId) {
@@ -1778,25 +2077,18 @@
                 secao.style.display = 'none';
             });
             
-            // Mostrar a seção solicitada
+            // Mostrar a seção desejada
             document.getElementById(secaoId).style.display = 'block';
-            
-            // Atualizar navegação ativa
+        }
+
+        function atualizarLinksAtivos(linkAtivo) {
+            // Remover classe active de todos os links
             document.querySelectorAll('.sidebar .nav-link').forEach(link => {
                 link.classList.remove('active');
             });
             
-            if (secaoId === 'dashboardSection') {
-                document.getElementById('dashboardLink').classList.add('active');
-            } else if (secaoId === 'vendedorasSection') {
-                document.getElementById('vendedorasLink').classList.add('active');
-            } else if (secaoId === 'vendasSection') {
-                document.getElementById('vendasLink').classList.add('active');
-            } else if (secaoId === 'relatoriosSection') {
-                document.getElementById('relatoriosLink').classList.add('active');
-            } else if (secaoId === 'configuracoesSection') {
-                document.getElementById('configuracoesLink').classList.add('active');
-            }
+            // Adicionar classe active ao link clicado
+            linkAtivo.classList.add('active');
         }
     </script>
 </body>
