@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SalesControl - Sistema de Controle de Vendas e Metas</title>
+    <title>Excelência Lingerie - Sistema de Controle de Vendas e Metas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -227,7 +227,7 @@
     <nav class="navbar navbar-expand-lg navbar-light fixed-top">
         <div class="container-fluid">
             <a class="navbar-brand ms-3" href="#" id="dashboardBrandLink">
-                <i class="fas fa-chart-line me-2"></i>SalesControl
+                <i class="fas fa-chart-line me-2"></i>Excelência Lingerie
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -611,7 +611,7 @@
                         <div class="card-body text-center">
                             <i class="fas fa-info-circle fa-3x mb-3 text-info"></i>
                             <h5 class="card-title">Sobre o Sistema</h5>
-                            <p class="card-text">SalesControl v1.0 - Desenvolvido para gestão de vendas</p>
+                            <p class="card-text">Excelência Lingerie v1.0 - Desenvolvido para gestão de vendas</p>
                         </div>
                     </div>
                 </div>
@@ -1409,7 +1409,7 @@
             const a = document.createElement('a');
             const dataAtual = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
             a.href = url;
-            a.download = `salescontrol_backup_${dataAtual}.json`;
+            a.download = `Excelência Lingerie_backup_${dataAtual}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1448,7 +1448,7 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('landscape'); // 'landscape' para orientação paisagem
 
-            doc.text('Relatório de Desempenho - SalesControl', 14, 20);
+            doc.text('Relatório de Desempenho - Excelência Lingerie', 14, 20);
             doc.setFontSize(10);
             const dataAtual = new Date().toLocaleDateString('pt-BR');
             const filtroVendedora = document.getElementById('filtroVendedora').options[document.getElementById('filtroVendedora').selectedIndex].text;
@@ -1525,7 +1525,7 @@
             doc.addImage(desempenhoImgData, 'PNG', margin, lastY + 25, imgWidth, imgHeight);
             doc.addImage(distribuicaoImgData, 'PNG', margin * 2 + imgWidth, lastY + 25, imgWidth, imgHeight);
 
-            const nomeArquivo = `relatorio_salescontrol_${dataAtual.replace(/\//g, '-')}.pdf`;
+            const nomeArquivo = `relatorio_Excelência Lingerie_${dataAtual.replace(/\//g, '-')}.pdf`;
             doc.save(nomeArquivo);
         }
 
@@ -1586,7 +1586,7 @@
             const a = document.createElement('a');
             const dataAtual = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
             a.href = url;
-            a.download = `salescontrol_backup_automatico_${dataAtual}.json`;
+            a.download = `Excelência Lingerie_backup_automatico_${dataAtual}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
