@@ -198,6 +198,19 @@
             margin-bottom: 0;
         }
         
+        /* Classe para impressão */
+        @media print {
+            body > *:not(#dashboardSection) {
+                display: none !important;
+            }
+            #dashboardSection {
+                display: block !important;
+            }
+            #dashboardSection .d-flex.justify-content-between.align-items-center.mb-4 {
+                display: block !important;
+            }
+        }
+        
         @media (max-width: 768px) {
             .main-content {
                 padding-top: 20px;
@@ -276,13 +289,16 @@
         <div id="dashboardSection">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="mb-0">Dashboard</h2>
-                <div>
-                    <select class="form-select" id="periodFilter">
+                <div class="d-flex align-items-center">
+                    <select class="form-select me-2" id="periodFilter">
                         <option value="day">Hoje</option>
                         <option value="week">Esta Semana</option>
                         <option value="month" selected>Este Mês</option>
                         <option value="year">Este Ano</option>
                     </select>
+                    <button class="btn btn-danger" id="exportDashboardPdf">
+                        <i class="fas fa-file-pdf"></i>
+                    </button>
                 </div>
             </div>
 
@@ -486,10 +502,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="mb-0">Relatórios</h2>
                 <div>
-                    <button class="btn btn-primary" id="generatePdf">
-                        <i class="fas fa-download me-1"></i> Baixar PDF
-                    </button>
-                </div>
+                    </div>
             </div>
 
             <div class="filter-section">
@@ -604,15 +617,6 @@
                             <i class="fas fa-database fa-3x mb-3 text-primary"></i>
                             <h5 class="card-title">Backup de Dados</h5>
                             <p class="card-text">Faça backup ou restaure os dados do sistema</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card config-card">
-                        <div class="card-body text-center">
-                            <i class="fas fa-info-circle fa-3x mb-3 text-info"></i>
-                            <h5 class="card-title">Sobre o Sistema</h5>
-                            <p class="card-text">Excelência Lingerie v1.0 - Desenvolvido para gestão de vendas</p>
                         </div>
                     </div>
                 </div>
@@ -923,7 +927,8 @@
                 case 'month':
                     vendasFiltradas = vendas.filter(v => {
                         const dataVenda = new Date(v.data + 'T00:00:00');
-                        return dataVenda.getFullYear() === hoje.getFullYear() && dataVenda.getMonth() === hoje.getMonth();
+                        return dataVenda.getFullYear() === hoje.getFullYear() &&
+                               dataVenda.getMonth() === hoje.getMonth();
                     });
                     break;
                 case 'year':
@@ -954,18 +959,17 @@
             const itensPorVenda = totalVendas > 0 ? totalPecas / totalVendas : 0;
             const precoMedio = totalPecas > 0 ? totalValorLiquido / totalPecas : 0;
             const ticketMedio = totalAtendimentos > 0 ? (totalValorLiquido + totalConsignado) / totalAtendimentos : 0;
-            
+
             document.getElementById('vendasEfetuadas').textContent = totalVendas;
             document.getElementById('totalPecas').textContent = totalPecas;
             document.getElementById('vendaMedia').textContent = formatarMoeda(vendaMedia);
             document.getElementById('itensPorVenda').textContent = itensPorVenda.toFixed(1);
             document.getElementById('precoMedio').textContent = formatarMoeda(precoMedio);
             document.getElementById('ticketMedio').textContent = formatarMoeda(ticketMedio);
-            
+
             const desempenho = calcularDesempenhoVendedoras(vendasFiltradas);
             const tableBody = document.querySelector('#desempenhoTable tbody');
             tableBody.innerHTML = '';
-            
             if (desempenho.length > 0) {
                 document.getElementById('emptyDesempenho').classList.add('d-none');
                 document.getElementById('tableDesempenho').classList.remove('d-none');
@@ -1045,7 +1049,6 @@
                     }
                 });
             }
-
             const ctxDistribuicao = document.getElementById('distribuicaoChart').getContext('2d');
             if (distribuicaoChart) {
                 distribuicaoChart.destroy();
@@ -1179,7 +1182,6 @@
                     `;
                     tableBody.appendChild(row);
                 });
-
                 document.querySelectorAll('.edit-venda').forEach(btn => {
                     btn.addEventListener('click', function() {
                         const id = this.getAttribute('data-id');
@@ -1198,18 +1200,15 @@
             }
         }
 
-        function atualizarRelatorios(vendasFiltradas = vendas) {
+        function atualizarRelatorios() {
+            const vendasFiltradas = filtrarVendasPorPeriodo();
+            dadosFiltrados = calcularDesempenhoVendedoras(vendasFiltradas);
             const tableBody = document.querySelector('#reportTable tbody');
             tableBody.innerHTML = '';
-            
-            const desempenho = calcularDesempenhoVendedoras(vendasFiltradas);
-            dadosFiltrados = desempenho;
-
-            if (desempenho.length > 0) {
+            if (dadosFiltrados.length > 0) {
                 document.getElementById('emptyRelatorios').classList.add('d-none');
                 document.getElementById('tableRelatorios').classList.remove('d-none');
-
-                desempenho.forEach(d => {
+                dadosFiltrados.forEach(d => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${d.nome}</td>
@@ -1232,33 +1231,70 @@
                 document.getElementById('emptyRelatorios').classList.remove('d-none');
                 document.getElementById('tableRelatorios').classList.add('d-none');
             }
-            atualizarGraficosRelatorio(desempenho);
+            atualizarGraficosRelatorios();
         }
 
-        function atualizarGraficosRelatorio(desempenho) {
-            const ctxDesempenho = document.getElementById('relatorioDesempenhoChart').getContext('2d');
+        function filtrarVendasPorPeriodo() {
+            const periodo = document.getElementById('filtroPeriodo').value;
+            let vendasFiltradas = [];
+            
+            if (periodo === 'custom') {
+                const dataInicio = document.getElementById('dataInicio').value;
+                const dataFim = document.getElementById('dataFim').value;
+                if (dataInicio && dataFim) {
+                    vendasFiltradas = vendas.filter(v => v.data >= dataInicio && v.data <= dataFim);
+                } else {
+                    return vendas; // Retorna todas se as datas personalizadas não estiverem completas
+                }
+            } else if (periodo === 'all') {
+                vendasFiltradas = vendas;
+            } else {
+                const hoje = new Date();
+                vendasFiltradas = vendas.filter(v => {
+                    const dataVenda = new Date(v.data + 'T00:00:00');
+                    switch (periodo) {
+                        case 'day':
+                            return dataVenda.getFullYear() === hoje.getFullYear() && dataVenda.getMonth() === hoje.getMonth() && dataVenda.getDate() === hoje.getDate();
+                        case 'week':
+                            const diaSemana = hoje.getDay();
+                            const primeiroDiaSemana = new Date(hoje);
+                            primeiroDiaSemana.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
+                            primeiroDiaSemana.setHours(0, 0, 0, 0);
+                            const ultimoDiaSemana = new Date(primeiroDiaSemana);
+                            ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6);
+                            ultimoDiaSemana.setHours(23, 59, 59, 999);
+                            return dataVenda >= primeiroDiaSemana && dataVenda <= ultimoDiaSemana;
+                        case 'month':
+                            return dataVenda.getFullYear() === hoje.getFullYear() && dataVenda.getMonth() === hoje.getMonth();
+                        case 'year':
+                            return dataVenda.getFullYear() === hoje.getFullYear();
+                    }
+                });
+            }
+            
+            return vendasFiltradas;
+        }
+
+        function atualizarGraficosRelatorios() {
+            const ctxRelatorioDesempenho = document.getElementById('relatorioDesempenhoChart').getContext('2d');
             if (relatorioDesempenhoChart) {
                 relatorioDesempenhoChart.destroy();
             }
-            if (desempenho.length > 0) {
-                relatorioDesempenhoChart = new Chart(ctxDesempenho, {
+            if (dadosFiltrados.length > 0) {
+                relatorioDesempenhoChart = new Chart(ctxRelatorioDesempenho, {
                     type: 'bar',
                     data: {
-                        labels: desempenho.map(d => d.nome),
+                        labels: dadosFiltrados.map(d => d.nome),
                         datasets: [
                             {
-                                label: 'Meta',
-                                data: desempenho.map(d => d.meta),
-                                backgroundColor: 'rgba(67, 97, 238, 0.5)',
-                                borderColor: 'rgba(67, 97, 238, 1)',
-                                borderWidth: 1
+                                label: 'Valor Líquido',
+                                data: dadosFiltrados.map(d => d.valorLiquido),
+                                backgroundColor: 'rgba(67, 97, 238, 0.7)'
                             },
                             {
-                                label: 'Valor Líquido',
-                                data: desempenho.map(d => d.valorLiquido),
-                                backgroundColor: 'rgba(76, 201, 240, 0.5)',
-                                borderColor: 'rgba(76, 201, 240, 1)',
-                                borderWidth: 1
+                                label: 'Consignado',
+                                data: dadosFiltrados.map(d => d.consignado),
+                                backgroundColor: 'rgba(76, 201, 240, 0.7)'
                             }
                         ]
                     },
@@ -1266,41 +1302,27 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function(value) {
-                                        return 'R$ ' + value.toLocaleString('pt-BR', {maximumFractionDigits: 0});
-                                    }
-                                }
-                            }
+                            x: { stacked: true },
+                            y: { stacked: true, beginAtZero: true, ticks: { callback: (value) => formatarMoeda(value) } }
                         },
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        return context.dataset.label + ': ' + formatarMoeda(context.raw);
-                                    }
-                                }
-                            }
-                        }
+                        plugins: { tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${formatarMoeda(context.raw)}` } } }
                     }
                 });
             }
 
-            const ctxDistribuicao = document.getElementById('relatorioDistribuicaoChart').getContext('2d');
+            const ctxRelatorioDistribuicao = document.getElementById('relatorioDistribuicaoChart').getContext('2d');
             if (relatorioDistribuicaoChart) {
                 relatorioDistribuicaoChart.destroy();
             }
-            if (desempenho.length > 0) {
-                const totalVendas = desempenho.reduce((acc, d) => acc + d.valorLiquido, 0);
-                if (totalVendas > 0) {
-                    relatorioDistribuicaoChart = new Chart(ctxDistribuicao, {
+            if (dadosFiltrados.length > 0) {
+                const totalValor = dadosFiltrados.reduce((acc, d) => acc + d.total, 0);
+                if (totalValor > 0) {
+                    relatorioDistribuicaoChart = new Chart(ctxRelatorioDistribuicao, {
                         type: 'pie',
                         data: {
-                            labels: desempenho.map(d => d.nome),
+                            labels: dadosFiltrados.map(d => d.nome),
                             datasets: [{
-                                data: desempenho.map(d => d.valorLiquido),
+                                data: dadosFiltrados.map(d => d.total),
                                 backgroundColor: [
                                     'rgba(67, 97, 238, 0.7)',
                                     'rgba(76, 201, 240, 0.7)',
@@ -1319,11 +1341,7 @@
                             plugins: {
                                 tooltip: {
                                     callbacks: {
-                                        label: function(context) {
-                                            const value = context.raw;
-                                            const percentage = ((value / totalVendas) * 100).toFixed(1);
-                                            return `${context.label}: ${formatarMoeda(value)} (${percentage}%)`;
-                                        }
+                                        label: (context) => `${context.label}: ${formatarMoeda(context.raw)} (${((context.raw / totalValor) * 100).toFixed(1)}%)`
                                     }
                                 }
                             }
@@ -1333,32 +1351,29 @@
             }
         }
 
+        // Funções para gerenciamento de dados
         function salvarVendedora() {
             const id = document.getElementById('vendedoraId').value;
             const nome = document.getElementById('vendedoraNome').value;
             const meta = parseFloat(document.getElementById('vendedoraMeta').value);
-            if (nome && meta >= 0) {
-                if (id) {
-                    const index = vendedoras.findIndex(v => v.id === id);
-                    if (index > -1) {
-                        vendedoras[index] = { ...vendedoras[index], nome, meta };
-                    }
-                } else {
-                    const novaVendedora = { id: Date.now().toString(), nome, meta };
-                    vendedoras.push(novaVendedora);
+            if (!nome || isNaN(meta)) return;
+            if (id) {
+                const index = vendedoras.findIndex(v => v.id === id);
+                if (index !== -1) {
+                    vendedoras[index].nome = nome;
+                    vendedoras[index].meta = meta;
                 }
-                localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
-                atualizarTudo();
-                const modal = bootstrap.Modal.getInstance(document.getElementById('addVendedoraModal'));
-                modal.hide();
-                resetarFormVendedora();
+            } else {
+                vendedoras.push({
+                    id: Date.now().toString(),
+                    nome: nome,
+                    meta: meta
+                });
             }
-        }
-
-        function resetarFormVendedora() {
-            document.getElementById('vendedoraId').value = '';
-            document.getElementById('vendedoraNome').value = '';
-            document.getElementById('vendedoraMeta').value = '';
+            localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
+            limparFormularioVendedora();
+            atualizarTudo();
+            bootstrap.Modal.getInstance(document.getElementById('addVendedoraModal')).hide();
         }
 
         function editarVendedora(id) {
@@ -1373,13 +1388,36 @@
         }
 
         function prepararExclusaoVendedora(id) {
-            itemParaExcluir = id;
-            tipoItemParaExcluir = 'vendedora';
-            document.getElementById('deleteMessage').textContent = 'Tem certeza que deseja excluir esta vendedora? Esta ação não pode ser desfeita e todas as vendas associadas a ela serão perdidas.';
-            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-            modal.show();
+            const vendedora = obterVendedoraPorId(id);
+            if (vendedora) {
+                itemParaExcluir = id;
+                tipoItemParaExcluir = 'vendedora';
+                document.getElementById('deleteMessage').textContent = `Tem certeza que deseja excluir a vendedora ${vendedora.nome}? Todas as vendas associadas a ela serão mantidas, mas ficarão sem vendedora. Esta ação não pode ser desfeita.`;
+                const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+                modal.show();
+            }
         }
-        
+
+        function excluirItemConfirmado() {
+            if (tipoItemParaExcluir === 'vendedora') {
+                vendedoras = vendedoras.filter(v => v.id !== itemParaExcluir);
+                localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
+            } else if (tipoItemParaExcluir === 'venda') {
+                vendas = vendas.filter(v => v.id !== itemParaExcluir);
+                localStorage.setItem('vendas', JSON.stringify(vendas));
+            }
+            bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal')).hide();
+            atualizarTudo();
+            itemParaExcluir = null;
+            tipoItemParaExcluir = '';
+        }
+
+        function limparFormularioVendedora() {
+            document.getElementById('vendedoraId').value = '';
+            document.getElementById('vendedoraNome').value = '';
+            document.getElementById('vendedoraMeta').value = '';
+        }
+
         function salvarVenda() {
             const id = document.getElementById('vendaId').value;
             const data = document.getElementById('vendaData').value;
@@ -1388,35 +1426,31 @@
             const consignado = parseFloat(document.getElementById('vendaConsignado').value);
             const pecas = parseInt(document.getElementById('vendaPecas').value);
             const atendimentos = parseInt(document.getElementById('vendaAtendimentos').value);
-            
-            if (data && vendedoraId && valorLiquido >= 0 && consignado >= 0 && pecas > 0 && atendimentos > 0) {
-                if (id) {
-                    const index = vendas.findIndex(v => v.id === id);
-                    if (index > -1) {
-                        vendas[index] = { ...vendas[index], data, vendedoraId, valorLiquido, consignado, pecas, atendimentos };
-                    }
-                } else {
-                    const novaVenda = { id: Date.now().toString(), data, vendedoraId, valorLiquido, consignado, pecas, atendimentos };
-                    vendas.push(novaVenda);
-                }
-                localStorage.setItem('vendas', JSON.stringify(vendas));
-                atualizarTudo();
-                const modal = bootstrap.Modal.getInstance(document.getElementById('addVendaModal'));
-                modal.hide();
-                resetarFormVenda();
-            } else {
-                alert('Por favor, preencha todos os campos obrigatórios.');
-            }
-        }
+            if (!data || !vendedoraId || isNaN(valorLiquido) || isNaN(consignado) || isNaN(pecas) || isNaN(atendimentos)) return;
 
-        function resetarFormVenda() {
-            document.getElementById('vendaId').value = '';
-            document.getElementById('vendaData').value = formatarData(new Date());
-            document.getElementById('vendaVendedora').value = '';
-            document.getElementById('vendaValorLiquido').value = '';
-            document.getElementById('vendaConsignado').value = '';
-            document.getElementById('vendaPecas').value = '';
-            document.getElementById('vendaAtendimentos').value = '1';
+            const novaVenda = {
+                data,
+                vendedoraId,
+                valorLiquido,
+                consignado,
+                pecas,
+                atendimentos,
+            };
+
+            if (id) {
+                const index = vendas.findIndex(v => v.id === id);
+                if (index !== -1) {
+                    vendas[index] = { ...vendas[index], ...novaVenda };
+                }
+            } else {
+                novaVenda.id = Date.now().toString();
+                vendas.push(novaVenda);
+            }
+
+            localStorage.setItem('vendas', JSON.stringify(vendas));
+            limparFormularioVenda();
+            atualizarTudo();
+            bootstrap.Modal.getInstance(document.getElementById('addVendaModal')).hide();
         }
 
         function editarVenda(id) {
@@ -1435,37 +1469,34 @@
         }
 
         function prepararExclusaoVenda(id) {
-            itemParaExcluir = id;
-            tipoItemParaExcluir = 'venda';
-            document.getElementById('deleteMessage').textContent = 'Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita.';
-            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-            modal.show();
-        }
-
-        function confirmarExclusao() {
-            if (tipoItemParaExcluir === 'vendedora') {
-                vendas = vendas.filter(v => v.vendedoraId !== itemParaExcluir);
-                vendedoras = vendedoras.filter(v => v.id !== itemParaExcluir);
-                localStorage.setItem('vendas', JSON.stringify(vendas));
-                localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
-            } else if (tipoItemParaExcluir === 'venda') {
-                vendas = vendas.filter(v => v.id !== itemParaExcluir);
-                localStorage.setItem('vendas', JSON.stringify(vendas));
+            const venda = vendas.find(v => v.id === id);
+            if (venda) {
+                itemParaExcluir = id;
+                tipoItemParaExcluir = 'venda';
+                document.getElementById('deleteMessage').textContent = 'Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita.';
+                const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+                modal.show();
             }
-            atualizarTudo();
-            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal'));
-            modal.hide();
-            itemParaExcluir = null;
-            tipoItemParaExcluir = '';
         }
 
+        function limparFormularioVenda() {
+            document.getElementById('vendaId').value = '';
+            document.getElementById('vendaData').value = '';
+            document.getElementById('vendaVendedora').value = '';
+            document.getElementById('vendaValorLiquido').value = '';
+            document.getElementById('vendaConsignado').value = '';
+            document.getElementById('vendaPecas').value = '';
+            document.getElementById('vendaAtendimentos').value = '1';
+        }
+
+        // Funções de backup/restauração
         function exportarBackup() {
-            const dados = {
+            const data = {
                 vendedoras,
                 vendas
             };
-            const json = JSON.stringify(dados, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1476,23 +1507,27 @@
             URL.revokeObjectURL(url);
         }
 
-        function importarBackup(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
+        function importarBackup() {
+            const fileInput = document.getElementById('backupFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Por favor, selecione um arquivo de backup.');
+                return;
+            }
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const dados = JSON.parse(e.target.result);
-                    if (confirm('A importação de dados substituirá todos os dados atuais. Deseja continuar?')) {
-                        vendedoras = dados.vendedoras || [];
-                        vendas = dados.vendas || [];
-                        localStorage.setItem('vendedoras', JSON.stringify(vendedoras));
-                        localStorage.setItem('vendas', JSON.stringify(vendas));
-                        atualizarTudo();
-                        alert('Dados importados com sucesso!');
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('backupModal'));
-                        modal.hide();
+                    const importedData = JSON.parse(e.target.result);
+                    if (importedData.vendedoras && importedData.vendas) {
+                        if (confirm('Atenção: A importação de dados irá substituir todos os dados atuais do sistema. Deseja continuar?')) {
+                            localStorage.setItem('vendedoras', JSON.stringify(importedData.vendedoras));
+                            localStorage.setItem('vendas', JSON.stringify(importedData.vendas));
+                            alert('Dados restaurados com sucesso!');
+                            atualizarTudo();
+                            bootstrap.Modal.getInstance(document.getElementById('backupModal')).hide();
+                        }
+                    } else {
+                        alert('Arquivo de backup inválido. Ele deve conter os campos "vendedoras" e "vendas".');
                     }
                 } catch (error) {
                     alert('Erro ao processar o arquivo. Verifique se é um arquivo JSON válido.');
@@ -1501,243 +1536,176 @@
             reader.readAsText(file);
         }
 
+        // Funções da calculadora
+        const calculator = {
+            displayValue: '0',
+            firstOperand: null,
+            waitingForSecondOperand: false,
+            operator: null,
+        };
+
+        function inputDigit(digit) {
+            const { displayValue, waitingForSecondOperand } = calculator;
+            if (waitingForSecondOperand === true) {
+                calculator.displayValue = digit;
+                calculator.waitingForSecondOperand = false;
+            } else {
+                calculator.displayValue = displayValue === '0' ? digit : displayValue + digit;
+            }
+            updateDisplay();
+        }
+
+        function inputDecimal(dot) {
+            if (calculator.waitingForSecondOperand === true) return;
+            if (!calculator.displayValue.includes(dot)) {
+                calculator.displayValue += dot;
+            }
+            updateDisplay();
+        }
+
+        function handleOperator(nextOperator) {
+            const { firstOperand, displayValue, operator } = calculator;
+            const inputValue = parseFloat(displayValue);
+            if (operator && calculator.waitingForSecondOperand) {
+                calculator.operator = nextOperator;
+                return;
+            }
+            if (firstOperand === null) {
+                calculator.firstOperand = inputValue;
+            } else if (operator) {
+                const result = performCalculation[operator](firstOperand, inputValue);
+                calculator.displayValue = `${parseFloat(result.toFixed(7))}`;
+                calculator.firstOperand = result;
+            }
+            calculator.waitingForSecondOperand = true;
+            calculator.operator = nextOperator;
+            updateDisplay();
+        }
+
+        const performCalculation = {
+            '/': (firstOperand, secondOperand) => firstOperand / secondOperand,
+            '*': (firstOperand, secondOperand) => firstOperand * secondOperand,
+            '+': (firstOperand, secondOperand) => firstOperand + secondOperand,
+            '-': (firstOperand, secondOperand) => firstOperand - secondOperand,
+        };
+
+        function resetCalculator() {
+            calculator.displayValue = '0';
+            calculator.firstOperand = null;
+            calculator.waitingForSecondOperand = false;
+            calculator.operator = null;
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.getElementById('calculatorDisplay').value = calculator.displayValue;
+        }
+
+        // Função principal de exportação para PDF (nova funcionalidade)
+        async function exportarDashboardParaPDF() {
+            const dashboard = document.getElementById('dashboardSection');
+            
+            // Espera a renderização completa da tela
+            // Isso é importante para que os gráficos e outros elementos sejam desenhados corretamente
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Captura o conteúdo do dashboard como uma imagem
+            const canvas = await html2canvas(dashboard, {
+                scale: 2, // Aumenta a resolução para melhor qualidade no PDF
+                logging: false,
+                useCORS: true,
+                allowTaint: true
+            });
+            const imgData = canvas.toDataURL('image/png');
+            
+            // Cria o documento PDF em modo paisagem
+            const pdf = new jspdf.jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            // Calcula as dimensões para que a imagem caiba na página
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            const newImgWidth = imgWidth * ratio;
+            const newImgHeight = imgHeight * ratio;
+
+            // Adiciona a imagem ao PDF (centralizada)
+            const x = (pdfWidth - newImgWidth) / 2;
+            const y = (pdfHeight - newImgHeight) / 2;
+            pdf.addImage(imgData, 'PNG', x, y, newImgWidth, newImgHeight);
+            
+            // Salva o arquivo PDF
+            pdf.save('dashboard_excelencia_lingerie.pdf');
+        }
+
+        // Funções para gerenciamento de seções e eventos
         function atualizarTudo() {
             atualizarDashboard();
             atualizarListaVendedoras();
             atualizarListaVendas();
-            aplicarFiltroRelatorios();
+            atualizarRelatorios();
         }
 
-        function aplicarFiltroRelatorios() {
-            let vendasFiltradas = [...vendas];
-            const filtroVendedoraId = document.getElementById('filtroVendedora').value;
-            const filtroPeriodo = document.getElementById('filtroPeriodo').value;
-            const dataInicioStr = document.getElementById('dataInicio').value;
-            const dataFimStr = document.getElementById('dataFim').value;
-
-            if (filtroVendedoraId !== 'todas') {
-                vendasFiltradas = vendasFiltradas.filter(v => v.vendedoraId === filtroVendedoraId);
-            }
-
-            const hoje = new Date();
-            let dataInicio, dataFim;
-
-            switch (filtroPeriodo) {
-                case 'day':
-                    dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-                    dataFim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
-                    break;
-                case 'week':
-                    const diaSemana = hoje.getDay();
-                    dataInicio = new Date(hoje);
-                    dataInicio.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
-                    dataInicio.setHours(0, 0, 0, 0);
-                    dataFim = new Date(dataInicio);
-                    dataFim.setDate(dataInicio.getDate() + 6);
-                    dataFim.setHours(23, 59, 59, 999);
-                    break;
-                case 'month':
-                    dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-                    dataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999);
-                    break;
-                case 'year':
-                    dataInicio = new Date(hoje.getFullYear(), 0, 1);
-                    dataFim = new Date(hoje.getFullYear(), 11, 31, 23, 59, 59, 999);
-                    break;
-                case 'custom':
-                    if (!dataInicioStr || !dataFimStr) {
-                        alert('Por favor, selecione as datas de início e fim.');
-                        return;
-                    }
-                    dataInicio = new Date(dataInicioStr + 'T00:00:00');
-                    dataFim = new Date(dataFimStr + 'T23:59:59');
-                    
-                    if (dataInicio > dataFim) {
-                        alert('A data de início não pode ser maior que a data de fim.');
-                        return;
-                    }
-                    break;
-                case 'all':
-                default:
-                    dataInicio = null;
-                    dataFim = null;
-                    break;
-            }
-
-            if (dataInicio && dataFim) {
-                vendasFiltradas = vendasFiltradas.filter(v => {
-                    const dataVenda = new Date(v.data + 'T00:00:00');
-                    return dataVenda >= dataInicio && dataVenda <= dataFim;
-                });
-            }
-
-            atualizarRelatorios(vendasFiltradas);
-        }
-
-        function openCalculator(fieldId) {
-            currentCalculatorField = fieldId;
-            calculatorValue = document.getElementById(fieldId).value || '0';
-            document.getElementById('calculatorDisplay').value = calculatorValue;
-            const modal = new bootstrap.Modal(document.getElementById('calculatorModal'));
-            modal.show();
-        }
-
-        function updateCalculatorDisplay(value) {
-            const display = document.getElementById('calculatorDisplay');
-            if (value === 'clear') {
-                calculatorValue = '0';
-            } else if (value === '=') {
-                try {
-                    calculatorValue = eval(calculatorValue.replace(/,/g, '.')).toFixed(2);
-                } catch (e) {
-                    calculatorValue = 'Erro';
-                }
-            } else {
-                if (calculatorValue === '0' && !isNaN(value)) {
-                    calculatorValue = value;
-                } else {
-                    calculatorValue += value;
-                }
-            }
-            display.value = calculatorValue;
-        }
-
-        document.querySelectorAll('[data-calc]').forEach(button => {
-            button.addEventListener('click', () => {
-                updateCalculatorDisplay(button.getAttribute('data-calc'));
-            });
-        });
-
-        document.getElementById('applyCalculatorResult').addEventListener('click', () => {
-            if (currentCalculatorField && calculatorValue !== 'Erro') {
-                document.getElementById(currentCalculatorField).value = parseFloat(calculatorValue);
-                bootstrap.Modal.getInstance(document.getElementById('calculatorModal')).hide();
-            }
-        });
-        
-        function generatePdf() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape' });
-            
-            doc.setFontSize(18);
-            doc.text("Relatório de Desempenho - Excelência Lingerie", 14, 22);
-
-            const dataInicio = document.getElementById('dataInicio').value;
-            const dataFim = document.getElementById('dataFim').value;
-            const filtroPeriodo = document.getElementById('filtroPeriodo').options[document.getElementById('filtroPeriodo').selectedIndex].text;
-            const filtroVendedora = document.getElementById('filtroVendedora').options[document.getElementById('filtroVendedora').selectedIndex].text;
-
-            doc.setFontSize(12);
-            doc.text(`Vendedora: ${filtroVendedora}`, 14, 32);
-            doc.text(`Período: ${filtroPeriodo}`, 14, 38);
-            if (filtroPeriodo === 'Personalizado' && dataInicio && dataFim) {
-                doc.text(`De ${dataInicio} a ${dataFim}`, 14, 44);
-            }
-
-            const headers = ['Vendedora', 'Meta (R$)', 'Líquido (R$)', 'Consignado (R$)', 'Total (R$)', 'Meta (%)', 'Vendas', 'Peças', 'Atendimentos', 'Média (R$)', 'Itens/Venda', 'Preço Médio (R$)', 'Ticket Médio (R$)'];
-            const data = dadosFiltrados.map(d => [
-                d.nome,
-                formatarMoeda(d.meta),
-                formatarMoeda(d.valorLiquido),
-                formatarMoeda(d.consignado),
-                formatarMoeda(d.total),
-                d.metaAtingida.toFixed(1) + '%',
-                d.vendas,
-                d.pecas,
-                d.atendimentos,
-                formatarMoeda(d.vendaMedia),
-                d.itensPorVenda.toFixed(1),
-                formatarMoeda(d.precoMedio),
-                formatarMoeda(d.ticketMedio)
-            ]);
-
-            doc.autoTable({
-                startY: 50,
-                head: [headers],
-                body: data,
-                theme: 'striped',
-                headStyles: { fillColor: [67, 97, 238] },
-                columnStyles: {
-                    1: { halign: 'right' },
-                    2: { halign: 'right' },
-                    3: { halign: 'right' },
-                    4: { halign: 'right' },
-                    9: { halign: 'right' },
-                    11: { halign: 'right' },
-                    12: { halign: 'right' }
-                },
-                didDrawPage: (data) => {
-                    const finalY = data.cursor.y;
-                    
-                    const addChartsToPdf = (chartId, title, x, y, width, height) => {
-                        const canvas = document.getElementById(chartId);
-                        if (canvas && canvas.offsetParent !== null) {
-                            const originalScale = window.devicePixelRatio;
-                            window.devicePixelRatio = 2;
-                            html2canvas(canvas, { scale: window.devicePixelRatio, backgroundColor: null }).then(chartCanvas => {
-                                window.devicePixelRatio = originalScale;
-                                const imgData = chartCanvas.toDataURL('image/png');
-                                doc.setFontSize(14);
-                                doc.text(title, x, y - 5);
-                                doc.addImage(imgData, 'PNG', x, y, width, height);
-                                
-                                if (chartId === 'relatorioDistribuicaoChart') {
-                                    doc.save('relatorio-excelencia-lingerie.pdf');
-                                }
-                            }).catch(error => {
-                                console.error(`Erro ao gerar imagem do gráfico ${chartId}:`, error);
-                            });
-                        }
-                    };
-
-                    const marginX = 14;
-                    const chartWidth = (doc.internal.pageSize.getWidth() - (marginX * 3)) / 2; // Calcula a largura para caberem dois gráficos lado a lado
-                    const chartHeight = 80; // Altura fixa e menor
-                    
-                    const chartY = finalY + 10;
-                    
-                    // Condição para verificar se há espaço na página
-                    if (chartY + chartHeight + 20 < doc.internal.pageSize.getHeight()) {
-                        addChartsToPdf('relatorioDesempenhoChart', 'Gráfico de Desempenho', marginX, chartY, chartWidth, chartHeight);
-                        addChartsToPdf('relatorioDistribuicaoChart', 'Gráfico de Distribuição', marginX * 2 + chartWidth, chartY, chartWidth, chartHeight);
-                    } else {
-                        doc.addPage();
-                        addChartsToPdf('relatorioDesempenhoChart', 'Gráfico de Desempenho', marginX, 20, chartWidth, chartHeight);
-                        addChartsToPdf('relatorioDistribuicaoChart', 'Gráfico de Distribuição', marginX * 2 + chartWidth, 20, chartWidth, chartHeight);
-                    }
-                }
-            });
-        }
-
-        // Event Listeners
-        document.getElementById('salvarVendedora').addEventListener('click', salvarVendedora);
-        document.getElementById('salvarVenda').addEventListener('click', salvarVenda);
-        document.getElementById('confirmDelete').addEventListener('click', confirmarExclusao);
         document.getElementById('exportBackup').addEventListener('click', exportarBackup);
-        document.getElementById('importBackup').addEventListener('click', () => document.getElementById('backupFile').click());
-        document.getElementById('backupFile').addEventListener('change', importarBackup);
-        document.getElementById('btnNovaVenda').addEventListener('click', resetarFormVenda);
-        document.querySelectorAll('.calculator-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                openCalculator(this.getAttribute('data-field'));
-            });
-        });
-
-        document.getElementById('generatePdf').addEventListener('click', generatePdf);
-
-        document.getElementById('aplicarFiltro').addEventListener('click', aplicarFiltroRelatorios);
+        document.getElementById('importBackup').addEventListener('click', importarBackup);
+        document.getElementById('aplicarFiltro').addEventListener('click', atualizarRelatorios);
 
         document.getElementById('filtroPeriodo').addEventListener('change', function() {
-            const isCustom = this.value === 'custom';
-            document.getElementById('dataInicio').disabled = !isCustom;
-            document.getElementById('dataFim').disabled = !isCustom;
-            if (isCustom) {
-                document.getElementById('dataInicio').value = '';
-                document.getElementById('dataFim').value = '';
+            const customDates = document.getElementById('filtroPeriodo').value === 'custom';
+            document.getElementById('dataInicio').disabled = !customDates;
+            document.getElementById('dataFim').disabled = !customDates;
+        });
+
+        document.getElementById('salvarVendedora').addEventListener('click', salvarVendedora);
+        document.getElementById('salvarVenda').addEventListener('click', salvarVenda);
+        document.getElementById('confirmDelete').addEventListener('click', excluirItemConfirmado);
+        document.getElementById('btnNovaVenda').addEventListener('click', limparFormularioVenda);
+        
+        // Novo listener para o card de exportação de PDF
+        document.getElementById('exportDashboardPdf').addEventListener('click', exportarDashboardParaPDF);
+        
+
+        document.querySelectorAll('.calculator-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                currentCalculatorField = this.getAttribute('data-field');
+                resetCalculator();
+                const modal = new bootstrap.Modal(document.getElementById('calculatorModal'));
+                modal.show();
+            });
+        });
+
+        document.getElementById('applyCalculatorResult').addEventListener('click', function() {
+            if (currentCalculatorField) {
+                document.getElementById(currentCalculatorField).value = calculator.displayValue;
+                bootstrap.Modal.getInstance(document.getElementById('calculatorModal')).hide();
+                currentCalculatorField = '';
             }
         });
-        
-        // Navegação
+
+        document.querySelectorAll('#calculatorModal .btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const value = this.getAttribute('data-calc');
+                if (value) {
+                    if (value === 'clear') {
+                        resetCalculator();
+                    } else if (value === '=') {
+                        handleOperator(value);
+                    } else if (value === '.') {
+                        inputDecimal(value);
+                    } else if (['+', '-', '*', '/'].includes(value)) {
+                        handleOperator(value);
+                    } else {
+                        inputDigit(value);
+                    }
+                }
+            });
+        });
+
         document.getElementById('dashboardLink').addEventListener('click', function() {
             mostrarSecao('dashboardSection');
             atualizarLinksAtivos(this);
@@ -1759,7 +1727,7 @@
         document.getElementById('relatoriosLink').addEventListener('click', function() {
             mostrarSecao('relatoriosSection');
             atualizarLinksAtivos(this);
-            aplicarFiltroRelatorios();
+            atualizarRelatorios();
         });
 
         document.getElementById('configuracoesLink').addEventListener('click', function() {
