@@ -506,9 +506,10 @@
                         <div class="mb-3">
                             <label class="form-label">Período</label>
                             <select class="form-select" id="filtroPeriodo">
-                                <option value="day">Dia</option>
+                                <option value="all" selected>Todas</option>
+                                <option value="day">Hoje</option>
                                 <option value="week">Semana</option>
-                                <option value="month" selected>Mês</option>
+                                <option value="month">Mês</option>
                                 <option value="year">Ano</option>
                                 <option value="custom">Personalizado</option>
                             </select>
@@ -845,10 +846,8 @@
         function calcularDesempenhoVendedoras(vendasFiltradas = vendas) {
             const desempenho = [];
             
-            const vendedorasParaRelatorio = vendedoras.filter(vendedora => {
-                // Inclui a vendedora no relatório se houver vendas dela ou se o filtro for para "todas"
-                return vendasFiltradas.some(v => v.vendedoraId === vendedora.id) || document.getElementById('filtroVendedora').value === 'todas';
-            });
+            // Corrige a lógica para que o relatório mostre todas as vendedoras, mesmo as sem vendas no período filtrado
+            const vendedorasParaRelatorio = document.getElementById('filtroVendedora').value === 'todas' ? vendedoras : vendedoras.filter(v => v.id === document.getElementById('filtroVendedora').value);
             
             vendedorasParaRelatorio.forEach(vendedora => {
                 const vendasVendedora = vendasFiltradas.filter(v => v.vendedoraId === vendedora.id);
@@ -887,15 +886,51 @@
 
         function atualizarDashboard() {
             const hoje = new Date();
-            const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-            const vendasMes = vendas.filter(v => {
-                const dataVenda = new Date(v.data + 'T00:00:00'); // Corrigido
-                return dataVenda >= primeiroDiaMes && dataVenda <= hoje;
-            });
-            
-            const totalValorLiquido = vendasMes.reduce((acc, v) => acc + v.valorLiquido, 0);
-            const totalConsignado = vendasMes.reduce((acc, v) => acc + v.consignado, 0);
-            const totalPecas = vendasMes.reduce((acc, v) => acc + v.pecas, 0);
+            let vendasFiltradas;
+            const periodo = document.getElementById('periodFilter').value;
+
+            // Lógica de filtragem para o Dashboard
+            switch (periodo) {
+                case 'day':
+                    vendasFiltradas = vendas.filter(v => {
+                        const dataVenda = new Date(v.data + 'T00:00:00');
+                        return dataVenda.getFullYear() === hoje.getFullYear() &&
+                               dataVenda.getMonth() === hoje.getMonth() &&
+                               dataVenda.getDate() === hoje.getDate();
+                    });
+                    break;
+                case 'week':
+                    const diaSemana = hoje.getDay();
+                    const primeiroDiaSemana = new Date(hoje);
+                    primeiroDiaSemana.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
+                    const ultimoDiaSemana = new Date(primeiroDiaSemana);
+                    ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6);
+
+                    vendasFiltradas = vendas.filter(v => {
+                        const dataVenda = new Date(v.data + 'T00:00:00');
+                        return dataVenda >= primeiroDiaSemana && dataVenda <= ultimoDiaSemana;
+                    });
+                    break;
+                case 'month':
+                    vendasFiltradas = vendas.filter(v => {
+                        const dataVenda = new Date(v.data + 'T00:00:00');
+                        return dataVenda.getFullYear() === hoje.getFullYear() && dataVenda.getMonth() === hoje.getMonth();
+                    });
+                    break;
+                case 'year':
+                    vendasFiltradas = vendas.filter(v => {
+                        const dataVenda = new Date(v.data + 'T00:00:00');
+                        return dataVenda.getFullYear() === hoje.getFullYear();
+                    });
+                    break;
+                default:
+                    vendasFiltradas = vendas;
+                    break;
+            }
+
+            const totalValorLiquido = vendasFiltradas.reduce((acc, v) => acc + v.valorLiquido, 0);
+            const totalConsignado = vendasFiltradas.reduce((acc, v) => acc + v.consignado, 0);
+            const totalPecas = vendasFiltradas.reduce((acc, v) => acc + v.pecas, 0);
             
             const metaTotal = vendedoras.reduce((acc, v) => acc + v.meta, 0);
             const metaAtingida = metaTotal > 0 ? (totalValorLiquido / metaTotal) * 100 : 0;
@@ -905,8 +940,8 @@
             document.getElementById('metaAtingida').textContent = `${metaAtingida.toFixed(1)}%`;
             document.getElementById('pecasFaturadas').textContent = totalPecas;
 
-            const totalVendas = vendasMes.length;
-            const totalAtendimentos = vendasMes.reduce((acc, v) => acc + v.atendimentos, 0);
+            const totalVendas = vendasFiltradas.length;
+            const totalAtendimentos = vendasFiltradas.reduce((acc, v) => acc + v.atendimentos, 0);
             const vendaMedia = totalVendas > 0 ? totalValorLiquido / totalVendas : 0;
             const itensPorVenda = totalVendas > 0 ? totalPecas / totalVendas : 0;
             const precoMedio = totalPecas > 0 ? totalValorLiquido / totalPecas : 0;
@@ -919,7 +954,7 @@
             document.getElementById('precoMedio').textContent = formatarMoeda(precoMedio);
             document.getElementById('ticketMedio').textContent = formatarMoeda(ticketMedio);
             
-            const desempenho = calcularDesempenhoVendedoras(vendasMes);
+            const desempenho = calcularDesempenhoVendedoras(vendasFiltradas);
             const tableBody = document.querySelector('#desempenhoTable tbody');
             tableBody.innerHTML = '';
             
@@ -1120,11 +1155,12 @@
                 document.getElementById('emptyVendas').classList.add('d-none');
                 document.getElementById('tableVendas').classList.remove('d-none');
                 
+                // Exibe TODAS as vendas, ordenadas pela data mais recente
                 const vendasOrdenadas = [...vendas].sort((a, b) => new Date(b.data) - new Date(a.data));
                 
                 vendasOrdenadas.forEach(venda => {
                     const vendedora = obterVendedoraPorId(venda.vendedoraId);
-                    const data = new Date(venda.data);
+                    const data = new Date(venda.data + 'T00:00:00');
                     const dataFormatada = data.toLocaleDateString('pt-BR');
                     
                     const row = document.createElement('tr');
@@ -1206,7 +1242,16 @@
                     if (dataInicioStr && dataFimStr) {
                         dataInicioFiltro = new Date(dataInicioStr + 'T00:00:00');
                         dataFimFiltro = new Date(dataFimStr + 'T23:59:59');
+                    } else {
+                        // Se não há datas personalizadas, não filtra por data
+                        dataInicioFiltro = null;
+                        dataFimFiltro = null;
                     }
+                    break;
+                case 'all':
+                default:
+                    dataInicioFiltro = null;
+                    dataFimFiltro = null;
                     break;
             }
 
@@ -1500,30 +1545,33 @@
             // Adicionando os gráficos
             const lastY = doc.autoTable.previous.finalY;
             
-            // Captura o primeiro gráfico
-            const desempenhoCanvas = document.getElementById('relatorioDesempenhoChart');
-            const desempenhoImg = await html2canvas(desempenhoCanvas, { backgroundColor: '#ffffff' });
-            const desempenhoImgData = desempenhoImg.toDataURL('image/png');
+            // Verifica se há dados filtrados para gerar os gráficos
+            if (dadosFiltrados.length > 0) {
+                // Captura o primeiro gráfico
+                const desempenhoCanvas = document.getElementById('relatorioDesempenhoChart');
+                const desempenhoImg = await html2canvas(desempenhoCanvas, { backgroundColor: '#ffffff' });
+                const desempenhoImgData = desempenhoImg.toDataURL('image/png');
 
-            // Captura o segundo gráfico
-            const distribuicaoCanvas = document.getElementById('relatorioDistribuicaoChart');
-            const distribuicaoImg = await html2canvas(distribuicaoCanvas, { backgroundColor: '#ffffff' });
-            const distribuicaoImgData = distribuicaoImg.toDataURL('image/png');
-            
-            // Calcula as posições das imagens no PDF
-            const pdfWidth = doc.internal.pageSize.getWidth();
-            const pdfHeight = doc.internal.pageSize.getHeight();
-            const margin = 15;
-            const imgWidth = (pdfWidth - margin * 3) / 2;
-            const imgHeight = imgWidth / (desempenhoImg.width / desempenhoImg.height);
-            
-            // Adiciona um título para os gráficos
-            doc.setFontSize(12);
-            doc.text('Gráficos de Desempenho', margin, lastY + 20);
+                // Captura o segundo gráfico
+                const distribuicaoCanvas = document.getElementById('relatorioDistribuicaoChart');
+                const distribuicaoImg = await html2canvas(distribuicaoCanvas, { backgroundColor: '#ffffff' });
+                const distribuicaoImgData = distribuicaoImg.toDataURL('image/png');
+                
+                // Calcula as posições das imagens no PDF
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const pdfHeight = doc.internal.pageSize.getHeight();
+                const margin = 15;
+                const imgWidth = (pdfWidth - margin * 3) / 2;
+                const imgHeight = imgWidth / (desempenhoImg.width / desempenhoImg.height);
+                
+                // Adiciona um título para os gráficos
+                doc.setFontSize(12);
+                doc.text('Gráficos de Desempenho', margin, lastY + 20);
 
-            // Adiciona as imagens ao documento
-            doc.addImage(desempenhoImgData, 'PNG', margin, lastY + 25, imgWidth, imgHeight);
-            doc.addImage(distribuicaoImgData, 'PNG', margin * 2 + imgWidth, lastY + 25, imgWidth, imgHeight);
+                // Adiciona as imagens ao documento
+                doc.addImage(desempenhoImgData, 'PNG', margin, lastY + 25, imgWidth, imgHeight);
+                doc.addImage(distribuicaoImgData, 'PNG', margin * 2 + imgWidth, lastY + 25, imgWidth, imgHeight);
+            }
 
             const nomeArquivo = `relatorio_Excelência Lingerie_${dataAtual.replace(/\//g, '-')}.pdf`;
             doc.save(nomeArquivo);
@@ -1701,7 +1749,7 @@
             if (!isCustom) {
                 document.getElementById('dataInicio').value = '';
                 document.getElementById('dataFim').value = '';
-                atualizarRelatorios();
+                // Não chama atualizarRelatorios aqui, o botão "Filtrar" é o responsável.
             }
         });
 
@@ -1778,6 +1826,14 @@
 
         // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
+            // Adicionado novo valor 'all' para o filtro de relatórios
+            const filtroPeriodo = document.getElementById('filtroPeriodo');
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'Todas';
+            filtroPeriodo.insertBefore(allOption, filtroPeriodo.firstChild);
+            filtroPeriodo.value = 'all';
+
             atualizarTudo();
             const activeLink = document.getElementById('dashboardLink');
             if(activeLink) {
