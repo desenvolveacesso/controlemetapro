@@ -1596,7 +1596,7 @@
                     totalizadores.atendimentos += d.atendimentos;
                 });
 
-                const totalMeta = vendedoras.reduce((acc, v) => acc + v.meta, 0);
+                const totalMeta = dadosFiltrados.reduce((acc, d) => acc + d.meta, 0);
                 const totalMetaAtingida = totalMeta > 0 ? (totalizadores.valorLiquido / totalMeta) * 100 : 0;
                 const totalVendaMedia = totalizadores.vendas > 0 ? totalizadores.valorLiquido / totalizadores.vendas : 0;
                 const totalItensPorVenda = totalizadores.vendas > 0 ? totalizadores.pecas / totalizadores.vendas : 0;
