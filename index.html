@@ -234,6 +234,13 @@
                 height: 250px;
             }
         }
+
+        .report-to-export {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -502,7 +509,10 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2 class="mb-0">Relatórios</h2>
                 <div>
-                    </div>
+                    <button class="btn btn-danger" id="exportRelatoriosPdf">
+                        <i class="fas fa-file-pdf me-1"></i> Exportar PDF
+                    </button>
+                </div>
             </div>
 
             <div class="filter-section">
@@ -548,56 +558,58 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">
-                    Relatório de Desempenho
-                </div>
-                <div class="card-body">
-                    <div id="emptyRelatorios" class="empty-state">
-                        <i class="fas fa-chart-pie"></i>
-                        <h4>Nenhum dado disponível</h4>
-                        <p>Adicione vendedoras e vendas para gerar relatórios.</p>
+            <div id="relatorioToExport" class="report-to-export">
+                <div class="card">
+                    <div class="card-header">
+                        Relatório de Desempenho
                     </div>
-                    <div class="table-responsive d-none" id="tableRelatorios">
-                        <table class="table table-hover" id="reportTable">
-                            <thead>
-                                <tr>
-                                    <th>Vendedora</th>
-                                    <th>Meta</th>
-                                    <th>Valor Líquido</th>
-                                    <th>Consignado</th>
-                                    <th>Total</th>
-                                    <th>Meta Alcançada</th>
-                                    <th>Vendas</th>
-                                    <th>Peças</th>
-                                    <th>Atendimentos</th>
-                                    <th>Venda Média</th>
-                                    <th>Itens/Venda</th>
-                                    <th>Preço Médio</th>
-                                    <th>Ticket Médio</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card mt-4">
-                <div class="card-header">
-                    Gráficos de Desempenho
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6" id="chart-container-desempenho">
-                            <div class="chart-container">
-                                <canvas id="relatorioDesempenhoChart"></canvas>
-                            </div>
+                    <div class="card-body">
+                        <div id="emptyRelatorios" class="empty-state">
+                            <i class="fas fa-chart-pie"></i>
+                            <h4>Nenhum dado disponível</h4>
+                            <p>Adicione vendedoras e vendas para gerar relatórios.</p>
                         </div>
-                        <div class="col-md-6" id="chart-container-distribuicao">
-                            <div class="chart-container">
-                                <canvas id="relatorioDistribuicaoChart"></canvas>
+                        <div class="table-responsive d-none" id="tableRelatorios">
+                            <table class="table table-hover" id="reportTable">
+                                <thead>
+                                    <tr>
+                                        <th>Vendedora</th>
+                                        <th>Meta</th>
+                                        <th>Valor Líquido</th>
+                                        <th>Consignado</th>
+                                        <th>Total</th>
+                                        <th>Meta Alcançada</th>
+                                        <th>Vendas</th>
+                                        <th>Peças</th>
+                                        <th>Atendimentos</th>
+                                        <th>Venda Média</th>
+                                        <th>Itens/Venda</th>
+                                        <th>Preço Médio</th>
+                                        <th>Ticket Médio</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        Gráficos de Desempenho
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6" id="chart-container-desempenho">
+                                <div class="chart-container">
+                                    <canvas id="relatorioDesempenhoChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-md-6" id="chart-container-distribuicao">
+                                <div class="chart-container">
+                                    <canvas id="relatorioDistribuicaoChart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1236,21 +1248,24 @@
 
         function filtrarVendasPorPeriodo() {
             const periodo = document.getElementById('filtroPeriodo').value;
-            let vendasFiltradas = [];
-            
+            const vendedoraFiltroId = document.getElementById('filtroVendedora').value;
+            let vendasFiltradas = vendas;
+
+            // Filtra por vendedora se não for "todas"
+            if (vendedoraFiltroId !== 'todas') {
+                vendasFiltradas = vendasFiltradas.filter(v => v.vendedoraId === vendedoraFiltroId);
+            }
+
+            // Filtra por período
             if (periodo === 'custom') {
                 const dataInicio = document.getElementById('dataInicio').value;
                 const dataFim = document.getElementById('dataFim').value;
                 if (dataInicio && dataFim) {
-                    vendasFiltradas = vendas.filter(v => v.data >= dataInicio && v.data <= dataFim);
-                } else {
-                    return vendas; // Retorna todas se as datas personalizadas não estiverem completas
+                    vendasFiltradas = vendasFiltradas.filter(v => v.data >= dataInicio && v.data <= dataFim);
                 }
-            } else if (periodo === 'all') {
-                vendasFiltradas = vendas;
-            } else {
+            } else if (periodo !== 'all') {
                 const hoje = new Date();
-                vendasFiltradas = vendas.filter(v => {
+                vendasFiltradas = vendasFiltradas.filter(v => {
                     const dataVenda = new Date(v.data + 'T00:00:00');
                     switch (periodo) {
                         case 'day':
@@ -1601,31 +1616,22 @@
             document.getElementById('calculatorDisplay').value = calculator.displayValue;
         }
 
-        // Função principal de exportação para PDF (nova funcionalidade)
+        // Funções de exportação para PDF
         async function exportarDashboardParaPDF() {
             const dashboard = document.getElementById('dashboardSection');
-            
-            // Espera a renderização completa da tela
-            // Isso é importante para que os gráficos e outros elementos sejam desenhados corretamente
             await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Captura o conteúdo do dashboard como uma imagem
             const canvas = await html2canvas(dashboard, {
-                scale: 2, // Aumenta a resolução para melhor qualidade no PDF
+                scale: 2,
                 logging: false,
                 useCORS: true,
                 allowTaint: true
             });
             const imgData = canvas.toDataURL('image/png');
-            
-            // Cria o documento PDF em modo paisagem
             const pdf = new jspdf.jsPDF({
                 orientation: 'landscape',
                 unit: 'mm',
                 format: 'a4'
             });
-
-            // Calcula as dimensões para que a imagem caiba na página
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const imgWidth = canvas.width;
@@ -1633,14 +1639,38 @@
             const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
             const newImgWidth = imgWidth * ratio;
             const newImgHeight = imgHeight * ratio;
-
-            // Adiciona a imagem ao PDF (centralizada)
             const x = (pdfWidth - newImgWidth) / 2;
             const y = (pdfHeight - newImgHeight) / 2;
             pdf.addImage(imgData, 'PNG', x, y, newImgWidth, newImgHeight);
-            
-            // Salva o arquivo PDF
             pdf.save('dashboard_excelencia_lingerie.pdf');
+        }
+
+        async function exportarRelatoriosParaPDF() {
+            const relatorio = document.getElementById('relatorioToExport');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const canvas = await html2canvas(relatorio, {
+                scale: 2,
+                logging: false,
+                useCORS: true,
+                allowTaint: true
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jspdf.jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+            const newImgWidth = imgWidth * ratio;
+            const newImgHeight = imgHeight * ratio;
+            const x = (pdfWidth - newImgWidth) / 2;
+            const y = (pdfHeight - newImgHeight) / 2;
+            pdf.addImage(imgData, 'PNG', x, y, newImgWidth, newImgHeight);
+            pdf.save('relatorio_excelencia_lingerie.pdf');
         }
 
         // Funções para gerenciamento de seções e eventos
@@ -1656,10 +1686,11 @@
         document.getElementById('aplicarFiltro').addEventListener('click', atualizarRelatorios);
 
         document.getElementById('filtroPeriodo').addEventListener('change', function() {
-            const customDates = document.getElementById('filtroPeriodo').value === 'custom';
+            const customDates = this.value === 'custom';
             document.getElementById('dataInicio').disabled = !customDates;
             document.getElementById('dataFim').disabled = !customDates;
         });
+        document.getElementById('filtroVendedora').addEventListener('change', atualizarRelatorios);
 
         document.getElementById('salvarVendedora').addEventListener('click', salvarVendedora);
         document.getElementById('salvarVenda').addEventListener('click', salvarVenda);
@@ -1668,6 +1699,7 @@
         
         // Novo listener para o card de exportação de PDF
         document.getElementById('exportDashboardPdf').addEventListener('click', exportarDashboardParaPDF);
+        document.getElementById('exportRelatoriosPdf').addEventListener('click', exportarRelatoriosParaPDF);
         
 
         document.querySelectorAll('.calculator-btn').forEach(button => {
