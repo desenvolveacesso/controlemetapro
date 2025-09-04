@@ -12,13 +12,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
-            --success: #4cc9f0;
-            --light: #f8f9fa;
-            --dark: #212529;
-            --danger: #e63946;
-            --warning: #fca311;
+            --primary: #FFD700; /* Dourado */
+            --secondary: #B8860B; /* Dourado mais escuro */
+            --success: #333333; /* Cinza escuro para harmonizar */
+            --light: #FFFFFF; /* Branco */
+            --dark: #000000; /* Preto */
+            --danger: #e63946; /* Vermelho para ações de risco */
+            --warning: #fca311; /* Amarelo para avisos */
         }
         
         body {
@@ -75,11 +75,13 @@
         .btn-primary {
             background-color: var(--primary);
             border-color: var(--primary);
+            color: black;
         }
         
         .btn-primary:hover {
             background-color: var(--secondary);
             border-color: var(--secondary);
+            color: white;
         }
         
         .table th {
@@ -177,13 +179,13 @@
         
         .menu-card.active {
             background-color: var(--primary);
-            color: white;
+            color: black;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             border-color: var(--primary);
         }
         
         .menu-card.active i, .menu-card.active h5 {
-            color: white;
+            color: black;
         }
         
         .menu-card i {
@@ -1023,15 +1025,15 @@
                             {
                                 label: 'Meta',
                                 data: desempenho.map(d => d.meta),
-                                backgroundColor: 'rgba(67, 97, 238, 0.5)',
-                                borderColor: 'rgba(67, 97, 238, 1)',
+                                backgroundColor: 'rgba(255, 215, 0, 0.5)',
+                                borderColor: 'rgba(255, 215, 0, 1)',
                                 borderWidth: 1
                             },
                             {
                                 label: 'Valor Líquido',
                                 data: desempenho.map(d => d.valorLiquido),
-                                backgroundColor: 'rgba(76, 201, 240, 0.5)',
-                                borderColor: 'rgba(76, 201, 240, 1)',
+                                backgroundColor: 'rgba(184, 134, 11, 0.5)',
+                                borderColor: 'rgba(184, 134, 11, 1)',
                                 borderWidth: 1
                             }
                         ]
@@ -1075,9 +1077,9 @@
                             datasets: [{
                                 data: desempenho.map(d => d.valorLiquido),
                                 backgroundColor: [
-                                    'rgba(67, 97, 238, 0.7)',
-                                    'rgba(76, 201, 240, 0.7)',
-                                    'rgba(252, 163, 17, 0.7)',
+                                    'rgba(255, 215, 0, 0.7)',
+                                    'rgba(184, 134, 11, 0.7)',
+                                    'rgba(0, 0, 0, 0.7)',
                                     'rgba(230, 57, 70, 0.7)',
                                     'rgba(111, 66, 193, 0.7)',
                                     'rgba(32, 201, 151, 0.7)',
@@ -1304,12 +1306,12 @@
                             {
                                 label: 'Valor Líquido',
                                 data: dadosFiltrados.map(d => d.valorLiquido),
-                                backgroundColor: 'rgba(67, 97, 238, 0.7)'
+                                backgroundColor: 'rgba(255, 215, 0, 0.7)'
                             },
                             {
                                 label: 'Consignado',
                                 data: dadosFiltrados.map(d => d.consignado),
-                                backgroundColor: 'rgba(76, 201, 240, 0.7)'
+                                backgroundColor: 'rgba(184, 134, 11, 0.7)'
                             }
                         ]
                     },
@@ -1339,9 +1341,9 @@
                             datasets: [{
                                 data: dadosFiltrados.map(d => d.total),
                                 backgroundColor: [
-                                    'rgba(67, 97, 238, 0.7)',
-                                    'rgba(76, 201, 240, 0.7)',
-                                    'rgba(252, 163, 17, 0.7)',
+                                    'rgba(255, 215, 0, 0.7)',
+                                    'rgba(184, 134, 11, 0.7)',
+                                    'rgba(0, 0, 0, 0.7)',
                                     'rgba(230, 57, 70, 0.7)',
                                     'rgba(111, 66, 193, 0.7)',
                                     'rgba(32, 201, 151, 0.7)',
